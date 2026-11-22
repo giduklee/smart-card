@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>모바일 포커 카드 4장</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #f3ecd2; color: #fff;
+      font-family: "Georgia", serif;
+      overflow: hidden; touch-action: none;
+    }
+    body {
+      display: flex; justify-content: center; align-items: center;
+      padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+      min-height: 100vh; min-height: 100dvh;
+    }
+
+    .card-wrapper {
+      position: relative;
+      width: min(88vw, 350px, calc((100dvh - 112px) * 5 / 7));
+      aspect-ratio: 5 / 7;
+      height: auto;
+      transition: transform 0.26s ease, opacity 0.26s ease;
+    }
+    @media (max-width: 360px) {
+      .card-wrapper { width: min(90vw, calc((100dvh - 104px) * 5 / 7)); }
+    }
+    .card-wrapper.slide-out-right { animation: liftRight 0.4s ease-in forwards; }
+    .card-wrapper.enter-from-left { transition: none !important; transform: translateX(-35%); opacity: 0; }
+    .card-wrapper.slide-out-left { animation: liftLeft 0.4s ease-in forwards; }
+    @keyframes liftRight {
+      0% { transform: translate(0, 0) scale(1); opacity: 1; }
+      35% { transform: translate(0, 0) scale(1.18); opacity: 1; }
+      100% { transform: translate(65%, 0) scale(1.18); opacity: 0; }
+    }
+    @keyframes liftLeft {
+      0% { transform: translate(0, 0) scale(1); opacity: 1; }
+      35% { transform: translate(0, 0) scale(1.18); opacity: 1; }
+      100% { transform: translate(-65%, 0) scale(1.18); opacity: 0; }
+    }
+    .card-wrapper.enter-from-right { transition: none !important; transform: translateX(35%); opacity: 0; }
+
+    .card-scene {
+      position: relative; width: 100%; height: 100%;
+      perspective: 1200px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent; touch-action: none;
+    }
+    .card-flipper {
+      position: relative; width: 100%; height: 100%;
+      transform-style: preserve-3d; transform: rotateY(180deg); transition: transform 0.55s ease; pointer-events: none;
+    }
+    .card-scene.is-flipped .card-flipper { transform: rotateY(0deg); }
+
+    .card-face {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      border-radius: 22px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+      padding: clamp(10px, 3.5vw, 16px); background: #fff; border: 3px solid #dc2626;
+      box-shadow: 0 14px 30px rgba(0,0,0,0.45); user-select: none;
+    }
+
+    /* 뒷면: 빨강 바탕 + 흰색 테두리/마름모 무늬 */
+    .card-back { background: #fff; border-color: #000; }
+    .card-back-inner { width: 100%; height: 100%; background: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+
+    /* 앞면: 흰색 바탕 + 빨강 글자 */
+    .card-front { color: #000; border-color: #000; transform: rotateY(180deg); }
+    .card-front-inner {
+      position: relative; width: 100%; height: 100%;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      padding: clamp(28px, 8vw, 44px) 12px clamp(34px, 9vw, 52px); text-align: center;
+    }
+    .corner {
+      position: absolute; display: flex; flex-direction: column; align-items: center;
+      font-weight: bold; font-size: 1.8rem; line-height: 1.05;
+    }
+    .top-left { top: 4px; left: 4px; }
+    .bottom-right { bottom: 4px; right: 4px; transform: rotate(180deg); }
+    .center-pip { font-size: 5.2rem; line-height: 1; }
+    .card-note {
+      margin-top: 12px; max-width: 88%; color: #b91c1c;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 0.9rem; font-weight: 600; line-height: 1.35; word-break: keep-all;
+    }
+    .card-note.empty { display: none; }
+    .center-pip, .corner { display: none; }
+    .hanja {
+      font-size: clamp(5rem, 23vw, 8rem); line-height: 1; font-weight: 700;
+      font-family: "Noto Serif KR", "Noto Serif CJK KR", "Songti SC", "Batang", serif;
+    }
+    .hun {
+      font-size: clamp(1.65rem, 7vw, 2.4rem); font-weight: 700; color: #000;
+      text-align: center; word-break: keep-all;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .en {
+      margin-top: 14px; padding: 0 10px; text-align: center; word-break: keep-all;
+      font-size: clamp(1.1rem, 4.8vw, 1.6rem); font-style: italic; letter-spacing: .04em; color: #6b5233;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+    #startScreen.en-ui h1 { font-size: clamp(1.5rem, 7vw, 2rem); letter-spacing: .06em; line-height: 1.25; max-width: 86vw; }
+    #startScreen.en-ui h1::after { letter-spacing: .5em; }
+    .lang-row { display: flex; gap: 12px; justify-content: center; margin-top: 4px; }
+    .lang-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      min-width: 96px; padding: 10px 14px 8px; cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: .85rem; font-weight: 700; color: #715735;
+      background: rgba(255,255,255,.45); border: 2px solid rgba(107,82,51,.28); border-radius: 18px;
+      -webkit-tap-highlight-color: transparent; transition: all .16s ease;
+    }
+    .lang-btn .flag { font-size: 2rem; line-height: 1; filter: grayscale(1); opacity: .55; transition: all .16s ease; }
+    .lang-btn.on { background: #dcebd2; border-color: #5b754b; color: #182016; box-shadow: 0 4px 10px rgba(42,58,35,.18); }
+    .lang-btn.on .flag { filter: none; opacity: 1; }
+    .lang-btn:active { transform: translateY(2px); }
+    #startScreen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;
+      display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px;
+      background: #f3ecd2; color: #000; touch-action: manipulation;
+    }
+    #startScreen { padding: max(20px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom)); }
+    #startScreen h1 { font-size: clamp(2rem, 9vw, 2.6rem); letter-spacing: 0.2em; margin-bottom: 12px; }
+    .menu-btn {
+      width: min(220px, 82vw); min-height: 54px; padding: 14px 0; font-size: clamp(1.1rem, 5vw, 1.3rem); font-weight: 700;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #000; background: #fff; border: 3px solid #000; border-radius: 14px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .menu-btn:active { background: #e5e5e5; }
+    #status { min-height: 1.4em; font-size: 0.95rem; color: #444; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    #homeBtn {
+      position: fixed; top: calc(env(safe-area-inset-top, 0px) + 8px); left: 8px; z-index: 5;
+      padding: 9px 16px; min-height: 42px; font-size: 0.9rem; font-weight: 700; color: #000; background: #fff;
+      border: 2px solid #000; border-radius: 10px; cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    /* ---- 전통 한지 · 고급 서예풍 테마 ---- */
+    html, body {
+      background-color: #d8c8a3;
+      background-image:
+        radial-gradient(ellipse at 18% 12%, rgba(255,255,235,.52), transparent 42%),
+        radial-gradient(ellipse at 82% 88%, rgba(117,83,42,.13), transparent 48%),
+        repeating-linear-gradient(7deg, rgba(112,82,43,.025) 0 1px, transparent 1px 5px),
+        linear-gradient(135deg, #e9dfc5 0%, #d9c9a6 48%, #cdbb94 100%);
+    }
+    body { color: #292318; }
+    .card-wrapper { filter: drop-shadow(0 18px 22px rgba(49, 35, 17, .22)); }
+    .card-face {
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.7), 0 10px 24px rgba(57,42,20,.2);
+    }
+    .card-face.card-back, .card-face.card-front {
+      background-color: #fff;
+      background-image:
+        radial-gradient(ellipse at 20% 18%, rgba(255,255,255,.95), transparent 45%),
+        radial-gradient(ellipse at 85% 82%, rgba(120,105,85,.035), transparent 50%),
+        repeating-linear-gradient(0deg, rgba(106,82,47,.018) 0 1px, transparent 1px 4px),
+        linear-gradient(145deg, #fff, #fafafa);
+      border: 3px solid #493923;
+    }
+    .card-face::before {
+      content: ""; position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px;
+      border: 1px solid rgba(133, 101, 54, .58); border-radius: 12px; pointer-events: none;
+    }
+    .card-face::after {
+      content: " "; position: absolute; inset: 15px; border: 1px solid rgba(255,255,255,.55);
+      border-radius: 8px; pointer-events: none;
+    }
+    .card-front-inner { z-index: 1; }
+    .hanja {
+      color: #17120f;
+      /* 붓글씨 계열 글꼴이 설치된 기기에서는 우선 사용하고, 없으면 묵직한 명조체로 대체 */
+      font-family: "Nanum Brush Script", "KCC-Ganpan", "HCR Batang", "Noto Serif KR",
+                   "Nanum Myeongjo", "Noto Serif CJK KR", "Batang", "KaiTi", "STKaiti", serif;
+      font-weight: 900;
+      letter-spacing: .015em;
+      -webkit-text-stroke: .7px rgba(23, 18, 15, .82);
+      text-shadow:
+        .7px .5px 0 rgba(23, 18, 15, .55),
+        1.4px 1px 0 rgba(23, 18, 15, .28),
+        0 3px 2px rgba(62, 39, 22, .18);
+      filter: contrast(1.12);
+    }
+    .hun {
+      color: #34291d;
+      letter-spacing: .08em;
+      font-family: "Noto Serif KR", "Nanum Myeongjo", "Batang", serif;
+    }
+    .hun::after {
+      content: ""; display: block; width: 54px; height: 2px; margin: 18px auto 0;
+      border-radius: 2px; background: linear-gradient(90deg, transparent, #9b3028 18%, #9b3028 82%, transparent);
+    }
+    #startScreen {
+      background-color: #d8c8a3;
+      background-image:
+        radial-gradient(ellipse at 18% 12%, rgba(255,255,235,.52), transparent 42%),
+        repeating-linear-gradient(7deg, rgba(112,82,43,.025) 0 1px, transparent 1px 5px),
+        linear-gradient(135deg, #e9dfc5 0%, #d9c9a6 48%, #cdbb94 100%);
+    }
+    #startScreen h1 {
+      color: #302316; font-size: 2.6rem; text-align: center;
+      font-family: "Noto Serif KR", "Nanum Myeongjo", "Batang", serif;
+      letter-spacing: .24em; text-shadow: 0 2px 0 rgba(255,255,255,.45);
+    }
+    #startScreen h1::after {
+      content: "千字文"; display: block; margin-top: 12px; padding-top: 10px;
+      border-top: 1px solid rgba(117,83,42,.45); font-size: 1rem; font-weight: 400;
+      letter-spacing: .65em; color: #8a392e;
+    }
+    .menu-btn {
+      border-radius: 8px; border: 1px solid #6b5233;
+      background: linear-gradient(180deg, #fff, #f5f5f5);
+      color: #382a1b; box-shadow: 0 4px 0 #765b38, 0 7px 13px rgba(60,42,19,.12);
+      transition: transform .1s ease, box-shadow .1s ease;
+    }
+    .menu-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #765b38; background: #ededed; }
+    #startBtn {
+      background: linear-gradient(180deg, #9d382d, #76251f); color: #fff8e9;
+      border-color: #64231d; box-shadow: 0 4px 0 #552019, 0 7px 13px rgba(60,25,16,.18);
+    }
+    #startBtn:active { background: #76251f; }
+    #status { color: #715735; }
+    #homeBtn {
+      border-radius: 7px; border: 1px solid #6b5233; box-shadow: 0 2px 0 #765b38;
+      background: linear-gradient(180deg, #fff, #f5f5f5); color: #382a1b;
+    }
+    @media (max-height: 560px) {
+      #startScreen { gap: 9px; }
+      #startScreen h1 { margin-bottom: 2px; }
+      .menu-btn { min-height: 44px; padding: 9px 0; }
+      .card-wrapper { width: min(62vw, calc((100dvh - 76px) * 5 / 7)); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+  
+    /* 버튼 디자인: 참고 이미지의 1번 스타일 */
+    .menu-btn, #homeBtn {
+      color: #182016;
+      background: #dcebd2;
+      border: 1px solid rgba(91, 117, 75, .22);
+      border-radius: 26px;
+      box-shadow: 0 7px 14px rgba(42, 58, 35, .18),
+                  inset 0 1px 0 rgba(255,255,255,.72);
+      transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+    .menu-btn {
+      min-height: 68px;
+      padding: 16px 22px;
+      font-weight: 700;
+      letter-spacing: .02em;
+    }
+    #homeBtn {
+      background: #dcebd2;
+      border-radius: 18px;
+      box-shadow: 0 4px 10px rgba(42, 58, 35, .16);
+    }
+    .menu-btn:active, #homeBtn:active {
+      background: #cfe2c3;
+      transform: translateY(2px);
+      box-shadow: 0 3px 7px rgba(42, 58, 35, .16);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .menu-btn, #homeBtn { transition: none; }
+    }
+
+    /* 갈색 시작 버튼을 흰색으로 변경 */
+    #startBtn {
+      background: linear-gradient(180deg, #ffffff, #f7f7f7);
+      color: #182016;
+      border-color: rgba(91, 117, 75, .22);
+      box-shadow: 0 7px 14px rgba(42, 58, 35, .18),
+                  inset 0 1px 0 rgba(255,255,255,.9);
+    }
+    #startBtn:active { background: #ededed; }
+
+  
+    /* ---- 시작 화면: Google Material 3 스타일 ---- */
+    #startScreen {
+      --m3-surface: #f8f9fa;
+      --m3-on-surface: #202124;
+      --m3-on-surface-variant: #5f6368;
+      --m3-primary: #1a73e8;
+      --m3-on-primary: #ffffff;
+      --m3-primary-container: #d3e3fd;
+      --m3-on-primary-container: #041e49;
+      --m3-outline: #747775;
+      --m3-font: "Google Sans", "Product Sans", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, "Segoe UI", sans-serif;
+      background: var(--m3-surface);
+      background-image: none;
+      color: var(--m3-on-surface);
+      font-family: var(--m3-font);
+      gap: 0;
+    }
+    #startScreen .m3-logo {
+      width: 72px; height: 72px; margin-bottom: 20px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; background: var(--m3-primary-container); color: var(--m3-on-primary-container);
+      font-size: 2.1rem; line-height: 1;
+      font-family: "Noto Serif KR", "Noto Serif CJK KR", "Songti SC", "Batang", serif; font-weight: 700;
+    }
+    #startScreen h1,
+    #startScreen.en-ui h1 {
+      margin: 0 0 40px; max-width: 86vw;
+      font-family: var(--m3-font); font-weight: 500; color: var(--m3-on-surface);
+      font-size: clamp(2rem, 9vw, 2.5rem); line-height: 1.2; letter-spacing: 0; text-shadow: none;
+    }
+    #startScreen.en-ui h1 { font-size: clamp(1.5rem, 7vw, 1.85rem); }
+    #startScreen h1::after,
+    #startScreen.en-ui h1::after {
+      content: "千字文"; display: block; margin-top: 8px; padding: 0; border: 0;
+      font-size: .95rem; font-weight: 400; letter-spacing: .4em; text-indent: .4em; color: var(--m3-on-surface-variant);
+    }
+    #startScreen .m3-actions {
+      width: min(320px, 86vw); display: flex; flex-direction: column; gap: 12px;
+    }
+    #startScreen .menu-btn {
+      width: 100%; min-height: 56px; padding: 0 24px; border: 0; border-radius: 28px;
+      font-family: var(--m3-font); font-size: 1rem; font-weight: 500; letter-spacing: .01em;
+      cursor: pointer; transition: box-shadow .2s ease, background-color .2s ease, transform .1s ease;
+    }
+    /* 시작: Filled button */
+    #startScreen #startBtn {
+      background: var(--m3-primary); color: var(--m3-on-primary);
+      box-shadow: 0 1px 2px rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+    }
+    #startScreen #startBtn:hover { background: #1b66c9; box-shadow: 0 1px 3px rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15); }
+    #startScreen #startBtn:active { background: #185abc; box-shadow: 0 1px 2px rgba(60,64,67,.3); transform: none; }
+    /* 저장: Filled tonal button */
+    #startScreen #saveBtn {
+      background: var(--m3-primary-container); color: var(--m3-on-primary-container); box-shadow: none;
+    }
+    #startScreen #saveBtn:hover { background: #c4d9fb; box-shadow: 0 1px 2px rgba(60,64,67,.3); }
+    #startScreen #saveBtn:active { background: #b6cff8; box-shadow: none; transform: none; }
+    /* 초기화: Outlined button */
+    #startScreen #resetBtn {
+      background: transparent; color: var(--m3-primary); box-shadow: inset 0 0 0 1px #dadce0;
+    }
+    #startScreen #resetBtn:hover { background: rgba(26,115,232,.08); }
+    #startScreen #resetBtn:active { background: rgba(26,115,232,.16); transform: none; }
+    #startScreen .menu-btn:focus-visible,
+    #startScreen .lang-btn:focus-visible { outline: 3px solid rgba(26,115,232,.45); outline-offset: 2px; }
+
+    /* 언어: Segmented button */
+    #startScreen .lang-row {
+      display: inline-flex; gap: 0; margin-top: 32px; overflow: hidden;
+      border: 1px solid var(--m3-outline); border-radius: 20px;
+    }
+    #startScreen .lang-btn {
+      flex-direction: row; gap: 8px; min-width: 116px; height: 40px; padding: 0 16px;
+      justify-content: center; border: 0; border-radius: 0; box-shadow: none;
+      background: transparent; color: var(--m3-on-surface);
+      font-family: var(--m3-font); font-size: .875rem; font-weight: 500; letter-spacing: .01em;
+      transition: background-color .15s ease;
+    }
+    #startScreen .lang-btn + .lang-btn { border-left: 1px solid var(--m3-outline); }
+    #startScreen .lang-btn .flag { display: none; }
+    #startScreen .lang-btn:hover { background: rgba(32,33,36,.06); }
+    #startScreen .lang-btn:active { transform: none; background: rgba(32,33,36,.12); }
+    #startScreen .lang-btn.on { background: var(--m3-primary-container); color: var(--m3-on-primary-container); box-shadow: none; }
+    #startScreen .lang-btn.on::before { content: "\2713"; font-size: 1rem; line-height: 1; }
+
+    #startScreen #status {
+      margin-top: 24px; min-height: 1.4em; max-width: 86vw; text-align: center;
+      font-family: var(--m3-font); font-size: .875rem; letter-spacing: .01em; color: var(--m3-on-surface-variant);
+    }
+    @media (max-height: 640px) {
+      #startScreen .m3-logo { display: none; }
+      #startScreen h1, #startScreen.en-ui h1 { margin-bottom: 24px; }
+      #startScreen .menu-btn { min-height: 48px; }
+      #startScreen .lang-row { margin-top: 20px; }
+      #startScreen #status { margin-top: 14px; }
+    }
+  
+    /* ---- 카드 화면: Google Material 3 스타일 ---- */
+    html, body { background-color: #f8f9fa; background-image: none; color: #202124; }
+    .card-wrapper { filter: none; }
+    .card-face,
+    .card-face.card-back,
+    .card-face.card-front {
+      background: #ffffff; background-image: none; border: 0; border-radius: 28px;
+      box-shadow: 0 1px 3px rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15);
+    }
+    .card-face::before, .card-face::after { content: none; display: none; }
+    .hanja {
+      color: #202124; font-weight: 700; letter-spacing: 0;
+      -webkit-text-stroke: 0; text-shadow: none; filter: none;
+    }
+    .hun {
+      color: #202124; font-weight: 500; letter-spacing: 0;
+      font-family: "Google Sans", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, "Segoe UI", sans-serif;
+    }
+    .hun::after {
+      width: 40px; height: 3px; margin: 20px auto 0; border-radius: 2px; background: #1a73e8;
+    }
+    .en {
+      color: #5f6368; font-style: normal; letter-spacing: 0; font-weight: 400;
+      font-family: "Google Sans", Roboto, "Noto Sans KR", -apple-system, "Segoe UI", sans-serif;
+    }
+    #homeBtn {
+      min-height: 40px; padding: 0 20px; border: 0; border-radius: 20px;
+      background: #d3e3fd; color: #041e49; box-shadow: none;
+      font-family: "Google Sans", Roboto, "Noto Sans KR", -apple-system, "Segoe UI", sans-serif;
+      font-size: .875rem; font-weight: 500; letter-spacing: .01em;
+      transition: background-color .15s ease;
+    }
+    #homeBtn:hover { background: #c4d9fb; }
+    #homeBtn:active { background: #b6cff8; transform: none; box-shadow: none; }
+    #homeBtn:focus-visible { outline: 3px solid rgba(26,115,232,.45); outline-offset: 2px; }
+  
+    /* ---- 메인(언어 선택) 화면: Google Material 3 스타일 ---- */
+    #landing {
+      --m3-primary: #1a73e8; --m3-primary-container: #d3e3fd; --m3-on-primary-container: #041e49;
+      --m3-on-surface: #202124; --m3-on-surface-variant: #5f6368;
+      --m3-font: "Google Sans", "Product Sans", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, "Segoe UI", sans-serif;
+      position: fixed; inset: 0; z-index: 12;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: max(20px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
+      background: #f8f9fa; color: var(--m3-on-surface); font-family: var(--m3-font); touch-action: manipulation;
+    }
+    #landing .m3-logo {
+      width: 88px; height: 88px; margin-bottom: 24px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; background: var(--m3-primary-container); color: var(--m3-on-primary-container);
+      font-size: 2.6rem; line-height: 1; font-weight: 700;
+      font-family: "Noto Serif KR", "Noto Serif CJK KR", "Songti SC", "Batang", serif;
+    }
+    #landing h1 {
+      margin: 0; max-width: 86vw; text-align: center;
+      font-family: var(--m3-font); font-weight: 500; color: var(--m3-on-surface);
+      font-size: clamp(2rem, 9vw, 2.5rem); line-height: 1.2; letter-spacing: 0;
+    }
+    #landing.en-ui h1 { font-size: clamp(1.5rem, 7vw, 1.85rem); }
+    #landing h1::after {
+      content: "千字文"; display: block; margin-top: 8px;
+      font-size: .95rem; font-weight: 400; letter-spacing: .4em; text-indent: .4em; color: var(--m3-on-surface-variant);
+    }
+    #landing #landingSub {
+      margin: 20px 0 36px; max-width: 86vw; text-align: center;
+      font-size: 1rem; line-height: 1.5; color: var(--m3-on-surface-variant);
+    }
+    #landing .lang-row {
+      width: min(320px, 86vw); display: flex; flex-direction: column; gap: 12px; margin: 0;
+    }
+    #landing .lang-btn {
+      position: relative; width: 100%; min-width: 0; height: 72px; padding: 0 56px 0 20px;
+      flex-direction: row; align-items: center; justify-content: flex-start; text-align: left;
+      border: 1px solid #dadce0; border-radius: 20px; background: #ffffff; color: var(--m3-on-surface);
+      box-shadow: none; cursor: pointer; font-family: var(--m3-font);
+      transition: background-color .15s ease, border-color .15s ease;
+    }
+    #landing .lang-btn .lb { display: flex; flex-direction: column; gap: 2px; }
+    #landing .lang-btn b { font-size: 1.1rem; font-weight: 500; }
+    #landing .lang-btn small { font-size: .8rem; font-weight: 400; color: var(--m3-on-surface-variant); }
+    #landing .lang-btn:hover { background: #f1f3f4; }
+    #landing .lang-btn:active { transform: none; background: #e8eaed; box-shadow: none; }
+    #landing .lang-btn.on {
+      background: var(--m3-primary-container); border-color: var(--m3-primary); color: var(--m3-on-primary-container); box-shadow: none;
+    }
+    #landing .lang-btn.on small { color: #3c4f73; }
+    #landing .lang-btn.on::after {
+      content: "\2713"; position: absolute; right: 22px; top: 50%; transform: translateY(-50%);
+      font-size: 1.3rem; font-weight: 700; color: var(--m3-primary);
+    }
+    #landing #enterBtn {
+      width: min(320px, 86vw); min-height: 56px; margin-top: 28px; padding: 0 24px; border: 0; border-radius: 28px;
+      background: var(--m3-primary); color: #ffffff; cursor: pointer;
+      font-family: var(--m3-font); font-size: 1rem; font-weight: 500; letter-spacing: .01em;
+      box-shadow: 0 1px 2px rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+      transition: box-shadow .2s ease, background-color .2s ease;
+    }
+    #landing #enterBtn:hover { background: #1b66c9; box-shadow: 0 1px 3px rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15); }
+    #landing #enterBtn:active { background: #185abc; box-shadow: 0 1px 2px rgba(60,64,67,.3); }
+    #landing .lang-btn:focus-visible, #landing #enterBtn:focus-visible { outline: 3px solid rgba(26,115,232,.45); outline-offset: 2px; }
+    @media (max-height: 640px) {
+      #landing .m3-logo { display: none; }
+      #landing #landingSub { margin: 12px 0 18px; }
+      #landing .lang-btn { height: 60px; }
+      #landing #enterBtn { margin-top: 18px; min-height: 48px; }
+    }
+
+    /* 시작 화면의 '메인' 버튼 */
+    #startScreen #backBtn {
+      position: absolute; top: calc(env(safe-area-inset-top, 0px) + 8px); left: 8px;
+      min-height: 40px; padding: 0 20px; border: 0; border-radius: 20px; cursor: pointer;
+      background: #d3e3fd; color: #041e49;
+      font-family: "Google Sans", Roboto, "Noto Sans KR", -apple-system, "Segoe UI", sans-serif;
+      font-size: .875rem; font-weight: 500; letter-spacing: .01em; transition: background-color .15s ease;
+    }
+    #startScreen #backBtn:hover { background: #c4d9fb; }
+    #startScreen #backBtn:active { background: #b6cff8; }
+    #startScreen #backBtn:focus-visible { outline: 3px solid rgba(26,115,232,.45); outline-offset: 2px; }
+  
+    /* 스페인어 뜻 (영어 아래) */
+    .es {
+      margin-top: 10px; color: #80868b; font-style: normal; font-weight: 400; letter-spacing: 0;
+      font-size: clamp(1rem, 4.4vw, 1.2rem); text-align: center;
+      font-family: "Google Sans", Roboto, "Noto Sans KR", -apple-system, "Segoe UI", sans-serif;
+    }
+    @media (max-height: 640px) {
+      #landing .lang-btn { height: 56px; }
+      #landing .lang-row { gap: 8px; }
+    }
+  
+    /* 사용설명서 */
+    #landing #guideBtn {
+      width: min(320px, 86vw); min-height: 52px; margin-top: 12px; padding: 0 24px; cursor: pointer;
+      border: 1px solid #dadce0; border-radius: 28px; background: transparent; color: #1a73e8;
+      font-family: var(--m3-font); font-size: .95rem; font-weight: 500; letter-spacing: .01em;
+      transition: background-color .15s ease;
+    }
+    #landing #guideBtn:hover { background: rgba(26,115,232,.08); }
+    #landing #guideBtn:active { background: rgba(26,115,232,.16); }
+    #landing #guideBtn:focus-visible { outline: 3px solid rgba(26,115,232,.45); outline-offset: 2px; }
+    #guide {
+      position: fixed; inset: 0; z-index: 14; flex-direction: column; background: #f8f9fa; color: #202124;
+      font-family: "Google Sans", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, "Segoe UI", sans-serif;
+    }
+    #guide .g-bar {
+      display: flex; align-items: center; gap: 4px; flex: none;
+      padding: calc(env(safe-area-inset-top, 0px) + 8px) 8px 8px;
+    }
+    #guide #guideClose {
+      width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+      border: 0; border-radius: 50%; background: transparent; color: #202124; cursor: pointer;
+    }
+    #guide #guideClose:hover { background: rgba(32,33,36,.08); }
+    #guide #guideClose:active { background: rgba(32,33,36,.16); }
+    #guide #guideClose:focus-visible { outline: 3px solid rgba(26,115,232,.45); outline-offset: 2px; }
+    #guide h2 { margin: 0; font-size: 1.375rem; font-weight: 500; letter-spacing: 0; }
+    #guide .g-body {
+      flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      width: 100%; max-width: 560px; margin: 0 auto;
+      padding: 8px 16px calc(env(safe-area-inset-bottom, 0px) + 32px); counter-reset: sec;
+    }
+    #guide .g-card {
+      margin: 0 0 12px; padding: 18px 20px; background: #ffffff; border: 1px solid #e8eaed; border-radius: 20px;
+    }
+    #guide .g-card h3 {
+      display: flex; align-items: center; gap: 12px; margin: 0 0 10px;
+      font-size: 1.05rem; font-weight: 500; color: #202124;
+    }
+    #guide .g-card h3::before {
+      counter-increment: sec; content: counter(sec);
+      flex: none; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; background: #d3e3fd; color: #041e49; font-size: .875rem; font-weight: 500;
+    }
+    #guide .g-card ul { margin: 0; padding-left: 20px; }
+    #guide .g-card li { word-break: keep-all; overflow-wrap: break-word; margin: 6px 0; font-size: .9375rem; line-height: 1.6; color: #3c4043; }
+    @media (max-height: 700px) {
+      #landing #guideBtn { min-height: 44px; margin-top: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="landing">
+    <div class="m3-logo" aria-hidden="true">天</div>
+    <h1>천자문</h1>
+    <p id="landingSub">천 개의 한자를 카드로 익혀요</p>
+    <div class="lang-row" role="group" aria-label="Language">
+      <button class="lang-btn on" id="langKo" aria-pressed="true"><span class="lb"><b>한국어</b><small>훈·음으로 배우기</small></span></button>
+      <button class="lang-btn" id="langEn" aria-pressed="false"><span class="lb"><b>English</b><small>Learn with English meanings</small></span></button>
+      <button class="lang-btn" id="langEs" aria-pressed="false"><span class="lb"><b>Español</b><small>Aprende con significados en español</small></span></button>
+    </div>
+    <button id="enterBtn">들어가기</button>
+    <button id="guideBtn">사용설명서</button>
+  </div>
+  <div id="guide" role="dialog" aria-modal="true" aria-labelledby="guideTitle" style="display:none">
+    <div class="g-bar">
+      <button id="guideClose" aria-label="닫기"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" fill="currentColor"/></svg></button>
+      <h2 id="guideTitle">사용설명서</h2>
+    </div>
+    <div class="g-body" id="guideBody"></div>
+  </div>
+  <div id="startScreen" style="display:none">
+    <button id="backBtn">메인</button>
+    <div class="m3-logo" aria-hidden="true">天</div>
+    <h1>천자문</h1>
+    <div class="m3-actions">
+      <button class="menu-btn" id="startBtn">시작</button>
+      <button class="menu-btn" id="saveBtn">저장</button>
+      <button class="menu-btn" id="resetBtn">초기화</button>
+    </div>
+    <div id="status" role="status"></div>
+  </div>
+  <button id="homeBtn" style="display:none">처음</button>
+  <div class="card-wrapper" id="wrapper" style="display:none">
+    <div class="card-scene" id="card">
+      <div class="card-flipper">
+        <div class="card-face card-back"><div class="card-back-inner"><div class="hun" id="hun">하늘 천</div><div class="en" id="en">sky</div><div class="es" id="es">cielo</div></div></div>
+        <div class="card-face card-front" id="cardFront">
+          <div class="card-front-inner"><div class="hanja" id="hanja">天</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var cards = [
+      ["天","하늘 천"],["地","땅 지"],["玄","검을 현"],["黃","누를 황"],
+      ["宇","집 우"],["宙","집 주"],["洪","넓을 홍"],["荒","거칠 황"],
+      ["日","날 일"],["月","달 월"],["盈","찰 영"],["昃","기울 측"],
+      ["辰","별 진"],["宿","잘 숙"],["列","벌일 열"],["張","베풀 장"],
+      ["寒","찰 한"],["來","올 래"],["暑","더울 서"],["往","갈 왕"],
+      ["秋","가을 추"],["收","거둘 수"],["冬","겨울 동"],["藏","저장할 장"],
+      ["閏","윤달 윤"],["餘","남을 여"],["成","이룰 성"],["歲","해 세"],
+      ["律","가락 률"],["呂","음률 려"],["調","고를 조"],["陽","볕 양"],
+      ["雲","구름 운"],["騰","오를 등"],["致","이를 치"],["雨","비 우"],
+      ["露","이슬 로"],["結","맺을 결"],["爲","할 위"],["霜","서리 상"],
+      ["金","쇠 금"],["生","낳을 생"],["麗","고울 려"],["水","물 수"],
+      ["玉","구슬 옥"],["出","날 출"],["崑","산이름 곤"],["岡","언덕 강"],
+      ["劍","칼 검"],["號","이름 호"],["巨","클 거"],["闕","대궐 궐"],
+      ["珠","구슬 주"],["稱","일컬을 칭"],["夜","밤 야"],["光","빛 광"],
+      ["果","과실 과"],["珍","보배 진"],["李","오얏 리"],["柰","능금나무 내"],
+      ["菜","나물 채"],["重","무거울 중"],["芥","겨자 개"],["薑","생강 강"],
+      ["海","바다 해"],["鹹","짤 함"],["河","물 하"],["淡","묽을 담"],
+      ["鱗","비늘 린"],["潛","잠길 잠"],["羽","깃 우"],["翔","높이 날 상"],
+      ["龍","용 용"],["師","스승 사"],["火","불 화"],["帝","임금 제"],
+      ["鳥","새 조"],["官","벼슬 관"],["人","사람 인"],["皇","임금 황"],
+      ["始","처음 시"],["制","지을 제"],["文","글월 문"],["字","글자 자"],
+      ["乃","이에 내"],["服","옷 복"],["衣","옷 의"],["裳","치마 상"],
+      ["推","밀 추"],["位","자리 위"],["讓","사양할 양"],["國","나라 국"],
+      ["有","있을 유"],["虞","헤아릴 우"],["陶","질그릇 도"],["唐","당나라 당"],
+      ["弔","슬퍼할 조"],["民","백성 민"],["伐","칠 벌"],["罪","허물 죄"],
+      ["周","두루 주"],["發","쏠 발"],["殷","성할 은"],["湯","끓을 탕"],
+      ["坐","앉을 좌"],["朝","조정 조"],["問","물을 문"],["道","길 도"],
+      ["垂","드리울 수"],["拱","두 손 맞잡을 공"],["平","평평할 평"],["章","글월 장"]
+    ];
+    cards = cards.concat((
+      "愛사랑 애;育기를 육;黎검을 려;首머리 수;臣신하 신;伏엎드릴 복;戎오랑캐 융;羌오랑캐 강;遐멀 하;邇가까울 이;壹한 일;體몸 체;率거느릴 솔;賓손 빈;歸돌아갈 귀;王임금 왕;鳴울 명;鳳봉황새 봉;在있을 재;樹나무 수;白흰 백;駒망아지 구;食먹을 식;場마당 장;化될 화;被입을 피;草풀 초;木나무 목;" +
+      "賴힘입을 뢰;及미칠 급;萬일만 만;方모 방;蓋덮을 개;此이 차;身몸 신;髮터럭 발;四넉 사;大큰 대;五다섯 오;常항상 상;恭공손할 공;惟오직 유;鞠기를 국;養기를 양;豈어찌 기;敢감히 감;毁헐 훼;傷상할 상;女계집 녀;慕사모할 모;貞곧을 정;烈매울 렬;男사내 남;效본받을 효;才재주 재;良어질 량;" +
+      "知알 지;過지날 과;必반드시 필;改고칠 개;得얻을 득;能능할 능;莫말 막;忘잊을 망;罔없을 망;談말씀 담;彼저 피;短짧을 단;靡아닐 미;恃믿을 시;己자기 기;長길 장;信믿을 신;使하여금 사;可옳을 가;覆뒤집힐 복;器그릇 기;欲하고자 할 욕;難어려울 난;量헤아릴 량;墨먹 묵;悲슬플 비;絲실 사;染물들일 염;" +
+      "詩시 시;讚기릴 찬;羔새끼양 고;羊양 양;景볕 경;行다닐 행;維바 유;賢어질 현;克이길 극;念생각 념;作지을 작;聖성인 성;德덕 덕;建세울 건;名이름 명;立설 립;形모양 형;端바를 단;表겉 표;正바를 정;空빌 공;谷골짜기 곡;傳전할 전;聲소리 성;虛빌 허;堂집 당;習익힐 습;聽들을 청;" +
+      "禍재앙 화;因인할 인;惡악할 악;積쌓을 적;福복 복;緣인연 연;善착할 선;慶경사 경;尺자 척;璧구슬 벽;非아닐 비;寶보배 보;寸마디 촌;陰그늘 음;是옳을 시;競다툴 경;資자료 자;父아비 부;事섬길 사;君임금 군;曰가로 왈;嚴엄할 엄;與줄 여;敬공경할 경;孝효도 효;當마땅할 당;竭다할 갈;力힘 력;" +
+      "忠충성 충;則곧 즉;盡다할 진;命목숨 명;臨임할 림;深깊을 심;履밟을 리;薄얇을 박;夙일찍 숙;興흥할 흥;溫따뜻할 온;凊서늘할 정;似같을 사;蘭난초 란;斯이 사;馨향기 형;如같을 여;松소나무 송;之갈 지;盛성할 성;川내 천;流흐를 류;不아닐 불;息쉴 식;淵못 연;澄맑을 징;取취할 취;映비칠 영;" +
+      "容얼굴 용;止그칠 지;若같을 약;思생각 사;言말씀 언;辭말씀 사;安편안할 안;定정할 정;篤도타울 독;初처음 초;誠정성 성;美아름다울 미;愼삼갈 신;終끝날 종;宜마땅 의;令좋을 령;榮영화 영;業업 업;所바 소;基터 기;籍서적 적;甚심할 심;無없을 무;竟다할 경;學배울 학;優넉넉할 우;登오를 등;仕벼슬 사;" +
+      "攝잡을 섭;職벼슬 직;從좇을 종;政정사 정;存있을 존;以써 이;甘달 감;棠해당화 당;去갈 거;而어조사 이;益더할 익;詠읊을 영;樂풍류 악;殊다를 수;貴귀할 귀;賤천할 천;禮예도 례;別다를 별;尊높을 존;卑낮을 비;上위 상;和화할 화;下아래 하;睦화목할 목;夫지아비 부;唱부를 창;婦아내 부;隨따를 수;" +
+      "外밖 외;受받을 수;傅스승 부;訓가르칠 훈;入들 입;奉받들 봉;母어미 모;儀거동 의;諸모두 제;姑시어미 고;伯맏 백;叔아재비 숙;猶같을 유;子아들 자;比견줄 비;兒아이 아;孔구멍 공;懷품을 회;兄맏 형;弟아우 제;同한가지 동;氣기운 기;連이어질 연;枝가지 지;交사귈 교;友벗 우;投던질 투;分나눌 분;" +
+      "切끊을 절;磨갈 마;箴경계 잠;規법 규;仁어질 인;慈사랑할 자;隱숨을 은;惻슬플 측;造지을 조;次버금 차;弗아닐 불;離떠날 리;節마디 절;義옳을 의;廉청렴 렴;退물러갈 퇴;顚엎드릴 전;沛자빠질 패;匪아닐 비;虧이지러질 휴;性성품 성;靜고요할 정;情뜻 정;逸편안할 일;心마음 심;動움직일 동;神귀신 신;疲피곤할 피;" +
+      "守지킬 수;眞참 진;志뜻 지;滿찰 만;逐쫓을 축;物만물 물;意뜻 의;移옮길 이;堅굳을 견;持가질 지;雅우아할 아;操잡을 조;好좋을 호;爵벼슬 작;自스스로 자;縻얽을 미;都도읍 도;邑고을 읍;華빛날 화;夏여름 하;東동녘 동;西서녘 서;二두 이;京서울 경;背등 배;邙산이름 망;面얼굴 면;洛강이름 락;" +
+      "浮뜰 부;渭강이름 위;據의거할 거;涇통할 경;宮집 궁;殿큰집 전;盤밑받침 반;鬱무성할 울;樓다락 루;觀볼 관;飛날 비;驚놀랄 경;圖그림 도;寫베낄 사;禽날짐승 금;獸짐승 수;畵그림 화;彩채색 채;仙신선 선;靈신령 령;丙남녘 병;舍집 사;傍곁 방;啓열 계;甲갑옷 갑;帳휘장 장;對대할 대;楹기둥 영;" +
+      "肆베풀 사;筵자리 연;設베풀 설;席자리 석;鼓두드릴 고;瑟비파 슬;吹불 취;笙생황 생;陞오를 승;階섬돌 계;納바칠 납;陛섬돌 폐;弁고깔 변;轉구를 전;疑의심할 의;星별 성;右오른쪽 우;通통할 통;廣넓을 광;內안 내;左왼 좌;達통달할 달;承이을 승;明밝을 명;旣이미 기;集모을 집;墳무덤 분;典법 전;" +
+      "亦또 역;聚모을 취;群무리 군;英꽃부리 영;杜막을 두;藁볏짚 고;鍾쇠북 종;隸붙을 례;漆옻칠할 칠;書쓸 서;壁벽 벽;經경서 경;府마을 부;羅벌릴 라;將장수 장;相서로 상;路길 로;夾낄 협;槐홰나무 괴;卿벼슬 경;戶지게 호;封봉할 봉;八여덟 팔;縣고을 현;家집 가;給줄 급;千일천 천;兵군사 병;" +
+      "高높을 고;冠갓 관;陪더할 배;輦손수레 련;驅몰 구;轂바퀴 곡;振떨칠 진;纓갓끈 영;世세상 세;祿녹봉 록;侈사치할 치;富부귀 부;車수레 거;駕가마 가;肥살찔 비;輕가벼울 경;策꾀 책;功공로 공;茂무성할 무;實열매 실;勒굴레 륵;碑비석 비;刻새길 각;銘새길 명;磻강이름 반;溪시내 계;伊저 이;尹다스릴 윤;" +
+      "佐도울 좌;時때 시;阿언덕 아;衡저울대 형;奄가릴 엄;宅집 택;曲굽을 곡;阜언덕 부;微작을 미;旦아침 단;孰누구 숙;營경영할 영;桓굳셀 환;公공변될 공;匡바를 광;合모을 합;濟구제할 제;弱약할 약;扶도울 부;傾기울 경;綺비단 기;回돌아올 회;漢한수 한;惠은혜 혜;說말씀 열;感느낄 감;武굳셀 무;丁고무래 정;" +
+      "俊준걸 준;乂어질 예;密빽빽할 밀;勿말 물;多많을 다;士선비 사;寔참으로 식;寧편안할 녕;晉나라 진;楚나라 초;更다시 갱;霸으뜸 패;趙나라 조;魏나라 위;困괴로울 곤;橫가로 횡;假거짓 가;途길 도;滅멸할 멸;虢나라 괵;踐밟을 천;土흙 토;會모일 회;盟맹세할 맹;何어찌 하;遵좇을 준;約약속할 약;法법 법;" +
+      "韓나라 한;弊낡을 폐;煩번거로울 번;刑형벌 형;起일어날 기;翦자를 전;頗자못 파;牧칠 목;用쓸 용;軍군사 군;最가장 최;精자세할 정;宣베풀 선;威위엄 위;沙모래 사;漠아득할 막;馳달릴 치;譽기릴 예;丹붉을 단;靑푸를 청;九아홉 구;州고을 주;禹하우씨 우;跡자취 적;百일백 백;郡고을 군;秦나라 진;幷아우를 병;" +
+      "嶽산마루 악;宗마루 종;恒항상 항;岱뫼 대;禪봉선 선;主임금 주;云이를 운;亭정자 정;雁기러기 안;門문 문;紫자주빛 자;塞변방 새;鷄닭 계;田밭 전;赤붉을 적;城성 성;昆맏 곤;池못 지;碣비석 갈;石돌 석;鉅클 거;野들 야;洞골짜기 동;庭마당 정;曠밝을 광;遠멀 원;綿이어질 면;邈멀 막;" +
+      "巖바위 암;峀산굴 수;杳아득할 묘;冥어두울 명;治다스릴 치;本근본 본;於어조사 어;農농사 농;務힘쓸 무;茲이에 자;稼심을 가;穡거둘 색;俶비로소 숙;載실을 재;南남녘 남;畝이랑 무;我나 아;藝재주 예;黍기장 서;稷피 직;稅징수할 세;熟익을 숙;貢바칠 공;新새 신;勸권할 권;賞상줄 상;黜물리칠 출;陟오를 척;" +
+      "孟맏 맹;軻수레 가;敦도타울 돈;素흴 소;史역사 사;魚물고기 어;秉잡을 병;直곧을 직;庶여러 서;幾몇 기;中가운데 중;庸쓸 용;勞힘쓸 로;謙겸손할 겸;謹삼갈 근;勅경계할 칙;聆들을 령;音소리 음;察살필 찰;理다스릴 리;鑑거울 감;貌모양 모;辨분별할 변;色빛 색;貽끼칠 이;厥그 궐;嘉아름다울 가;猷꾀할 유;" +
+      "勉힘쓸 면;其그 기;祗공경할 지;植심을 식;省살필 성;躬몸 궁;譏나무랄 기;誡경계할 계;寵고일 총;增더할 증;抗막을 항;極다할 극;殆위태할 태;辱욕될 욕;近가까울 근;恥부끄러울 치;林수풀 림;皐언덕 고;幸다행 행;卽곧 즉;兩두 량;疏트일 소;見볼 견;機틀 기;解풀 해;組짤 조;誰누구 수;逼핍박할 핍;" +
+      "索찾을 색;居살 거;閑한가할 한;處곳 처;沈잠길 침;默묵묵할 묵;寂고요할 적;寥고요 요;求구할 구;古옛 고;尋찾을 심;論의논할 론;散흩어질 산;慮생각할 려;逍거닐 소;遙멀 요;欣기쁠 흔;奏아뢸 주;累묶을 루;遣보낼 견;慼슬플 척;謝사례할 사;歡기뻐할 환;招부를 초;渠도랑 거;荷연꽃 하;的과녁 적;歷지낼 력;" +
+      "園동산 원;莽풀 망;抽뺄 추;條가지 조;枇비파나무 비;杷비파나무 파;晩늦을 만;翠푸를 취;梧오동나무 오;桐오동나무 동;早일찍 조;凋시들 조;陳베풀 진;根뿌리 근;委맡길 위;翳가릴 예;落떨어질 락;葉잎사귀 엽;飄회오리바람 표;颻질풍 요;游헤엄칠 유;鵾새 곤;獨홀로 독;運돌 운;凌깔볼 릉;摩갈 마;絳진홍색 강;霄하늘 소;" +
+      "耽즐길 탐;讀읽을 독;翫가지고 놀 완;市시장 시;寓머무를 우;目눈 목;囊주머니 낭;箱상자 상;易바꿀 역;輶가벼울 유;攸바 유;畏두려워할 외;屬엮을 속;耳귀 이;垣담 원;牆담 장;具갖출 구;膳반찬 선;飡저녁밥 손;飯밥 반;適맞을 적;口입 구;充채울 충;腸창자 장;飽배부를 포;飫물릴 어;烹삶을 팽;宰재상 재;" +
+      "飢굶주릴 기;厭족할 염;糟지게미 조;糠겨 강;親친할 친;戚겨레 척;故옛 고;舊옛 구;老늙을 로;少적을 소;異다를 이;糧양식 량;妾첩 첩;御모실 어;績길쌈 적;紡길쌈 방;侍모실 시;巾수건 건;帷휘장 유;房방 방;紈흰비단 환;扇부채 선;圓둥글 원;潔깨끗할 결;銀은 은;燭촛불 촉;煒빛날 위;煌빛날 황;" +
+      "晝낮 주;眠잘 면;夕저녁 석;寐잘 매;藍쪽 람;筍죽순 순;象코끼리 상;牀평상 상;絃줄 현;歌노래 가;酒술 주;讌잔치 연;接사귈 접;杯잔 배;擧들 거;觴잔 상;矯바로잡을 교;手손 수;頓조아릴 돈;足발 족;悅기쁠 열;豫미리 예;且또 차;康편안할 강;嫡정실 적;後뒤 후;嗣이을 사;續이을 속;" +
+      "祭제사 제;祀제사 사;蒸찔 증;嘗맛볼 상;稽조아릴 계;顙이마 상;再거듭 재;拜절 배;悚두려워할 송;懼두려워할 구;恐두려울 공;惶두려워할 황;牋편지 전;牒편지 첩;簡대쪽 간;要구할 요;顧돌아볼 고;答대답할 답;審살필 심;詳자세할 상;骸뼈 해;垢때 구;想생각할 상;浴목욕할 욕;執잡을 집;熱더울 열;願원할 원;凉서늘할 량;" +
+      "驢나귀 려;騾노새 라;犢송아지 독;特수컷 특;駭놀랄 해;躍뛸 약;超넘을 초;驤달릴 양;誅벨 주;斬벨 참;賊도적 적;盜훔칠 도;捕잡을 포;獲얻을 획;叛배반할 반;亡망할 망;布베 포;射쏠 사;遼멀 료;丸알 환;嵇산이름 혜;琴거문고 금;阮악기 완;嘯휘파람 소;恬편안할 념;筆붓 필;倫인륜 륜;紙종이 지;" +
+      "鈞고를 균;巧공교할 교;任맡길 임;釣낚시 조;釋풀 석;紛어지러울 분;利이로울 리;俗풍속 속;竝아우를 병;皆다 개;佳아름다울 가;妙묘할 묘;毛털 모;施베풀 시;淑맑을 숙;姿모양 자;工장인 공;顰찡그릴 빈;姸고울 연;笑웃을 소;年해 년;矢화살 시;每매양 매;催재촉할 최;曦햇빛 희;暉빛날 휘;朗밝을 랑;曜빛날 요;" +
+      "璇구슬 선;璣구슬 기;懸매달 현;斡빙빙돌 알;晦그믐 회;魄넋 백;環고리 환;照비칠 조;指손가락 지;薪섶나무 신;修닦을 수;祐도울 우;永길 영;綏편안할 수;吉길할 길;劭아름다울 소;矩모날 구;步걸음 보;引끌 인;領옷깃 령;俯구부릴 부;仰우러를 앙;廊복도 랑;廟사당 묘;束묶을 속;帶띠 대;矜자랑 긍;莊엄숙할 장;" +
+      "徘노닐 배;徊노닐 회;瞻볼 첨;眺바라볼 조;孤외로울 고;陋좁을 루;寡적을 과;聞들을 문;愚어리석을 우;蒙어릴 몽;等등급 등;誚꾸짖을 초;謂이를 위;語말씀 어;助도울 조;者놈 자;焉어찌 언;哉어조사 재;乎어조사 호;也어조사 야"
+    ).split(";").map(function (s) { return [s.charAt(0), s.slice(1)]; }));
+    var EN = {"天": "sky", "地": "earth", "玄": "dark", "黃": "yellow", "宇": "house", "宙": "universe", "洪": "vast", "荒": "wild", "日": "sun", "月": "moon", "盈": "full", "昃": "wane", "辰": "star", "宿": "lodge", "列": "line up", "張": "spread", "寒": "cold", "來": "come", "暑": "hot", "往": "go", "秋": "autumn", "收": "harvest", "冬": "winter", "藏": "store", "閏": "leap", "餘": "surplus", "成": "achieve", "歲": "year", "律": "rhythm", "呂": "pitch", "調": "adjust", "陽": "sunshine", "雲": "cloud", "騰": "rise", "致": "bring about", "雨": "rain", "露": "dew", "結": "tie", "爲": "become", "霜": "frost", "金": "gold", "生": "produce", "麗": "beautiful", "水": "water", "玉": "jade", "出": "emerge", "崑": "Kunlun", "岡": "hill", "劍": "sword", "號": "name", "巨": "huge", "闕": "palace gate", "珠": "pearl", "稱": "praise", "夜": "night", "光": "light", "果": "fruit", "珍": "treasure", "李": "plum", "柰": "crabapple", "菜": "vegetable", "重": "heavy", "芥": "mustard", "薑": "ginger", "海": "sea", "鹹": "salty", "河": "river", "淡": "fresh", "鱗": "scale", "潛": "submerge", "羽": "feather", "翔": "soar", "龍": "dragon", "師": "teacher", "火": "fire", "帝": "emperor", "鳥": "bird", "官": "official", "人": "person", "皇": "sovereign", "始": "begin", "制": "create", "文": "writing", "字": "character", "乃": "then", "服": "clothe", "衣": "clothes", "裳": "skirt", "推": "push", "位": "position", "讓": "yield", "國": "nation", "有": "have", "虞": "Yu", "陶": "pottery", "唐": "Tang", "弔": "console", "民": "people", "伐": "attack", "罪": "sin", "周": "Zhou", "發": "emit", "殷": "prosperous", "湯": "hot water", "坐": "sit", "朝": "court", "問": "ask", "道": "way", "垂": "hang", "拱": "fold hands", "平": "flat", "章": "chapter", "愛": "love", "育": "raise", "黎": "black-haired", "首": "head", "臣": "subject", "伏": "prostrate", "戎": "barbarian", "羌": "Qiang", "遐": "distant", "邇": "near", "壹": "one", "體": "body", "率": "lead", "賓": "guest", "歸": "return", "王": "king", "鳴": "cry", "鳳": "phoenix", "在": "exist", "樹": "tree", "白": "white", "駒": "colt", "食": "eat", "場": "field", "化": "transform", "被": "cover", "草": "grass", "木": "wood", "賴": "rely", "及": "reach", "萬": "ten thousand", "方": "direction", "蓋": "cover", "此": "this", "身": "body", "髮": "hair", "四": "four", "大": "big", "五": "five", "常": "constant", "恭": "respectful", "惟": "only", "鞠": "nurture", "養": "nourish", "豈": "how", "敢": "dare", "毁": "destroy", "傷": "hurt", "女": "woman", "慕": "admire", "貞": "chaste", "烈": "fierce", "男": "man", "效": "imitate", "才": "talent", "良": "good", "知": "know", "過": "fault", "必": "surely", "改": "correct", "得": "obtain", "能": "able", "莫": "never", "忘": "forget", "罔": "not", "談": "talk", "彼": "that", "短": "short", "靡": "not", "恃": "rely on", "己": "self", "長": "long", "信": "trust", "使": "make", "可": "permissible", "覆": "overturn", "器": "vessel", "欲": "desire", "難": "difficult", "量": "measure", "墨": "ink", "悲": "sad", "絲": "thread", "染": "dye", "詩": "poem", "讚": "praise", "羔": "lamb", "羊": "sheep", "景": "scenery", "行": "walk", "維": "only", "賢": "wise", "克": "overcome", "念": "think", "作": "make", "聖": "sage", "德": "virtue", "建": "build", "名": "name", "立": "stand", "形": "shape", "端": "upright", "表": "outside", "正": "correct", "空": "empty", "谷": "valley", "傳": "transmit", "聲": "sound", "虛": "hollow", "堂": "hall", "習": "practice", "聽": "listen", "禍": "disaster", "因": "cause", "惡": "evil", "積": "accumulate", "福": "blessing", "緣": "fate", "善": "good", "慶": "celebration", "尺": "foot", "璧": "jade disc", "非": "not", "寶": "treasure", "寸": "inch", "陰": "shade", "是": "right", "競": "compete", "資": "resource", "父": "father", "事": "serve", "君": "lord", "曰": "say", "嚴": "stern", "與": "give", "敬": "respect", "孝": "filial piety", "當": "ought", "竭": "exhaust", "力": "strength", "忠": "loyalty", "則": "then", "盡": "use up", "命": "life", "臨": "approach", "深": "deep", "履": "tread", "薄": "thin", "夙": "early", "興": "rise", "溫": "warm", "凊": "cool", "似": "resemble", "蘭": "orchid", "斯": "this", "馨": "fragrant", "如": "like", "松": "pine", "之": "of", "盛": "flourish", "川": "stream", "流": "flow", "不": "not", "息": "rest", "淵": "pool", "澄": "clear", "取": "take", "映": "reflect", "容": "appearance", "止": "stop", "若": "as if", "思": "think", "言": "speech", "辭": "words", "安": "calm", "定": "settle", "篤": "sincere", "初": "beginning", "誠": "sincerity", "美": "beautiful", "愼": "careful", "終": "end", "宜": "proper", "令": "good", "榮": "glory", "業": "work", "所": "place", "基": "foundation", "籍": "record", "甚": "very", "無": "none", "竟": "end", "學": "learn", "優": "excel", "登": "ascend", "仕": "hold office", "攝": "take charge", "職": "duty", "從": "follow", "政": "politics", "存": "remain", "以": "with", "甘": "sweet", "棠": "pear tree", "去": "leave", "而": "and", "益": "increase", "詠": "chant", "樂": "music", "殊": "differ", "貴": "noble", "賤": "humble", "禮": "etiquette", "別": "distinguish", "尊": "honored", "卑": "lowly", "上": "above", "和": "harmony", "下": "below", "睦": "amity", "夫": "husband", "唱": "sing", "婦": "wife", "隨": "follow", "外": "outside", "受": "receive", "傅": "tutor", "訓": "teach", "入": "enter", "奉": "serve", "母": "mother", "儀": "manner", "諸": "all", "姑": "aunt", "伯": "eldest", "叔": "uncle", "猶": "like", "子": "child", "比": "compare", "兒": "child", "孔": "very", "懷": "cherish", "兄": "elder brother", "弟": "younger brother", "同": "same", "氣": "spirit", "連": "connect", "枝": "branch", "交": "associate", "友": "friend", "投": "throw", "分": "share", "切": "cut", "磨": "grind", "箴": "admonish", "規": "rule", "仁": "benevolence", "慈": "kindness", "隱": "hide", "惻": "compassion", "造": "make", "次": "next", "弗": "not", "離": "leave", "節": "integrity", "義": "righteousness", "廉": "honesty", "退": "retreat", "顚": "fall", "沛": "stumble", "匪": "not", "虧": "lack", "性": "nature", "靜": "quiet", "情": "feeling", "逸": "ease", "心": "heart", "動": "move", "神": "spirit", "疲": "tired", "守": "guard", "眞": "true", "志": "will", "滿": "full", "逐": "chase", "物": "thing", "意": "intent", "移": "shift", "堅": "firm", "持": "hold", "雅": "elegant", "操": "conduct", "好": "like", "爵": "rank", "自": "self", "縻": "bind", "都": "capital", "邑": "town", "華": "splendid", "夏": "summer", "東": "east", "西": "west", "二": "two", "京": "capital", "背": "back", "邙": "Mang", "面": "face", "洛": "Luo", "浮": "float", "渭": "Wei", "據": "rely on", "涇": "Jing", "宮": "palace", "殿": "hall", "盤": "coil", "鬱": "dense", "樓": "tower", "觀": "view", "飛": "fly", "驚": "startle", "圖": "picture", "寫": "draw", "禽": "bird", "獸": "beast", "畵": "painting", "彩": "color", "仙": "immortal", "靈": "spirit", "丙": "third", "舍": "house", "傍": "beside", "啓": "open", "甲": "first", "帳": "curtain", "對": "face", "楹": "pillar", "肆": "set out", "筵": "mat", "設": "arrange", "席": "seat", "鼓": "drum", "瑟": "zither", "吹": "blow", "笙": "reed organ", "陞": "ascend", "階": "steps", "納": "offer", "陛": "palace steps", "弁": "cap", "轉": "turn", "疑": "doubt", "星": "star", "右": "right", "通": "pass through", "廣": "wide", "內": "inside", "左": "left", "達": "reach", "承": "receive", "明": "bright", "旣": "already", "集": "gather", "墳": "ancient text", "典": "canon", "亦": "also", "聚": "gather", "群": "group", "英": "hero", "杜": "Du", "藁": "draft", "鍾": "bell", "隸": "clerical script", "漆": "lacquer", "書": "write", "壁": "wall", "經": "classic", "府": "office", "羅": "spread", "將": "general", "相": "minister", "路": "road", "夾": "flank", "槐": "pagoda tree", "卿": "minister", "戶": "household", "封": "enfeoff", "八": "eight", "縣": "county", "家": "family", "給": "supply", "千": "thousand", "兵": "soldier", "高": "tall", "冠": "cap", "陪": "accompany", "輦": "imperial cart", "驅": "drive", "轂": "wheel hub", "振": "shake", "纓": "cap strap", "世": "generation", "祿": "stipend", "侈": "extravagant", "富": "wealthy", "車": "cart", "駕": "carriage", "肥": "fat", "輕": "light", "策": "plan", "功": "merit", "茂": "lush", "實": "fruit", "勒": "engrave", "碑": "stele", "刻": "carve", "銘": "inscribe", "磻": "Pan", "溪": "brook", "伊": "Yi", "尹": "Yin", "佐": "assist", "時": "time", "阿": "hill", "衡": "balance", "奄": "suddenly", "宅": "dwelling", "曲": "bend", "阜": "mound", "微": "tiny", "旦": "dawn", "孰": "who", "營": "manage", "桓": "mighty", "公": "duke", "匡": "rectify", "合": "unite", "濟": "aid", "弱": "weak", "扶": "support", "傾": "collapse", "綺": "silk", "回": "return", "漢": "Han", "惠": "favor", "說": "Yue", "感": "feel", "武": "martial", "丁": "Ding", "俊": "talented", "乂": "govern", "密": "dense", "勿": "do not", "多": "many", "士": "scholar", "寔": "indeed", "寧": "peace", "晉": "Jin", "楚": "Chu", "更": "again", "霸": "hegemon", "趙": "Zhao", "魏": "Wei", "困": "hardship", "橫": "horizontal", "假": "borrow", "途": "road", "滅": "destroy", "虢": "Guo", "踐": "tread", "土": "soil", "會": "meet", "盟": "oath", "何": "how", "遵": "follow", "約": "promise", "法": "law", "韓": "Han", "弊": "worn out", "煩": "vexing", "刑": "punishment", "起": "rise", "翦": "Jian", "頗": "Po", "牧": "Mu", "用": "use", "軍": "army", "最": "most", "精": "refined", "宣": "proclaim", "威": "might", "沙": "sand", "漠": "desert", "馳": "gallop", "譽": "fame", "丹": "red", "靑": "blue", "九": "nine", "州": "province", "禹": "Yu", "跡": "trace", "百": "hundred", "郡": "district", "秦": "Qin", "幷": "merge", "嶽": "peak", "宗": "ancestor", "恒": "Heng", "岱": "Tai", "禪": "sacrifice", "主": "lord", "云": "say", "亭": "pavilion", "雁": "wild goose", "門": "gate", "紫": "purple", "塞": "frontier", "鷄": "chicken", "田": "field", "赤": "red", "城": "city wall", "昆": "Kun", "池": "pond", "碣": "stone tablet", "石": "stone", "鉅": "great", "野": "wilds", "洞": "cave", "庭": "courtyard", "曠": "vast", "遠": "far", "綿": "continuous", "邈": "remote", "巖": "cliff", "峀": "cave", "杳": "dim", "冥": "dark", "治": "govern", "本": "root", "於": "at", "農": "farming", "務": "strive", "茲": "this", "稼": "sow", "穡": "reap", "俶": "begin", "載": "load", "南": "south", "畝": "field ridge", "我": "I", "藝": "skill", "黍": "millet", "稷": "sorghum", "稅": "tax", "熟": "ripe", "貢": "tribute", "新": "new", "勸": "encourage", "賞": "reward", "黜": "dismiss", "陟": "promote", "孟": "Meng", "軻": "Ke", "敦": "sincere", "素": "plain", "史": "history", "魚": "fish", "秉": "hold", "直": "straight", "庶": "many", "幾": "nearly", "中": "middle", "庸": "mean", "勞": "toil", "謙": "modest", "謹": "cautious", "勅": "admonish", "聆": "hear", "音": "sound", "察": "examine", "理": "reason", "鑑": "mirror", "貌": "appearance", "辨": "distinguish", "色": "color", "貽": "bequeath", "厥": "his", "嘉": "fine", "猷": "plan", "勉": "strive", "其": "its", "祗": "revere", "植": "plant", "省": "examine", "躬": "oneself", "譏": "ridicule", "誡": "warn", "寵": "favor", "增": "increase", "抗": "resist", "極": "extreme", "殆": "danger", "辱": "disgrace", "近": "near", "恥": "shame", "林": "forest", "皐": "marsh", "幸": "fortunate", "卽": "immediately", "兩": "two", "疏": "sparse", "見": "see", "機": "chance", "解": "untie", "組": "ribbon", "誰": "who", "逼": "press", "索": "seek", "居": "dwell", "閑": "leisure", "處": "place", "沈": "sink", "默": "silent", "寂": "still", "寥": "lonely", "求": "seek", "古": "ancient", "尋": "search", "論": "discuss", "散": "scatter", "慮": "ponder", "逍": "stroll", "遙": "wander", "欣": "delight", "奏": "present", "累": "burden", "遣": "dispel", "慼": "grief", "謝": "thank", "歡": "joy", "招": "beckon", "渠": "canal", "荷": "lotus", "的": "bright", "歷": "pass through", "園": "garden", "莽": "weeds", "抽": "sprout", "條": "twig", "枇": "loquat", "杷": "loquat", "晩": "late", "翠": "emerald", "梧": "paulownia", "桐": "paulownia", "早": "early", "凋": "wither", "陳": "old", "根": "root", "委": "wither", "翳": "shade", "落": "fall", "葉": "leaf", "飄": "flutter", "颻": "flutter", "游": "swim", "鵾": "crane", "獨": "alone", "運": "move", "凌": "soar", "摩": "brush", "絳": "crimson", "霄": "sky", "耽": "indulge", "讀": "read", "翫": "enjoy", "市": "market", "寓": "lodge", "目": "eye", "囊": "bag", "箱": "chest", "易": "easy", "輶": "light", "攸": "that which", "畏": "fear", "屬": "belong", "耳": "ear", "垣": "wall", "牆": "wall", "具": "prepare", "膳": "meal", "飡": "supper", "飯": "rice", "適": "suit", "口": "mouth", "充": "fill", "腸": "gut", "飽": "full", "飫": "sated", "烹": "boil", "宰": "butcher", "飢": "hungry", "厭": "satiated", "糟": "dregs", "糠": "chaff", "親": "kin", "戚": "relative", "故": "old", "舊": "former", "老": "old", "少": "young", "異": "different", "糧": "provisions", "妾": "concubine", "御": "attend", "績": "spin", "紡": "weave", "侍": "attend", "巾": "towel", "帷": "curtain", "房": "room", "紈": "white silk", "扇": "fan", "圓": "round", "潔": "clean", "銀": "silver", "燭": "candle", "煒": "bright", "煌": "brilliant", "晝": "day", "眠": "sleep", "夕": "evening", "寐": "sleep", "藍": "indigo", "筍": "bamboo shoot", "象": "elephant", "牀": "bed", "絃": "string", "歌": "song", "酒": "wine", "讌": "banquet", "接": "receive", "杯": "cup", "擧": "raise", "觴": "goblet", "矯": "straighten", "手": "hand", "頓": "bow", "足": "foot", "悅": "pleased", "豫": "content", "且": "moreover", "康": "healthy", "嫡": "heir", "後": "after", "嗣": "succeed", "續": "continue", "祭": "sacrifice", "祀": "worship", "蒸": "winter offering", "嘗": "autumn offering", "稽": "kowtow", "顙": "forehead", "再": "again", "拜": "bow", "悚": "fearful", "懼": "afraid", "恐": "dread", "惶": "alarmed", "牋": "letter", "牒": "note", "簡": "slip", "要": "need", "顧": "look back", "答": "answer", "審": "examine", "詳": "detailed", "骸": "bones", "垢": "dirt", "想": "imagine", "浴": "bathe", "執": "hold", "熱": "heat", "願": "wish", "凉": "cool", "驢": "donkey", "騾": "mule", "犢": "calf", "特": "bull", "駭": "startle", "躍": "leap", "超": "surpass", "驤": "gallop", "誅": "execute", "斬": "behead", "賊": "thief", "盜": "robber", "捕": "catch", "獲": "capture", "叛": "rebel", "亡": "flee", "布": "cloth", "射": "shoot", "遼": "Liao", "丸": "pellet", "嵇": "Ji", "琴": "zither", "阮": "Ruan", "嘯": "whistle", "恬": "calm", "筆": "brush", "倫": "ethics", "紙": "paper", "鈞": "Jun", "巧": "skillful", "任": "Ren", "釣": "fish", "釋": "release", "紛": "tangle", "利": "benefit", "俗": "custom", "竝": "together", "皆": "all", "佳": "fine", "妙": "wondrous", "毛": "Mao", "施": "Shi", "淑": "virtuous", "姿": "posture", "工": "craft", "顰": "frown", "姸": "lovely", "笑": "smile", "年": "year", "矢": "arrow", "每": "each", "催": "urge", "曦": "sunlight", "暉": "radiance", "朗": "bright", "曜": "shine", "璇": "jade", "璣": "pearl", "懸": "hang", "斡": "revolve", "晦": "dark moon", "魄": "soul", "環": "ring", "照": "illuminate", "指": "finger", "薪": "firewood", "修": "cultivate", "祐": "bless", "永": "forever", "綏": "soothe", "吉": "auspicious", "劭": "exhort", "矩": "square", "步": "step", "引": "lead", "領": "collar", "俯": "bend down", "仰": "look up", "廊": "corridor", "廟": "temple", "束": "bind", "帶": "belt", "矜": "proud", "莊": "solemn", "徘": "pace", "徊": "linger", "瞻": "gaze", "眺": "look afar", "孤": "lonely", "陋": "humble", "寡": "few", "聞": "hear", "愚": "foolish", "蒙": "ignorant", "等": "equal", "誚": "rebuke", "謂": "say", "語": "speak", "助": "help", "者": "person", "焉": "final particle", "哉": "final particle", "乎": "final particle", "也": "final particle"};
+    var ES = {"天": "cielo", "地": "tierra", "玄": "oscuro", "黃": "amarillo", "宇": "casa", "宙": "universo", "洪": "vasto", "荒": "salvaje", "日": "sol", "月": "luna", "盈": "lleno", "昃": "menguar", "辰": "estrella", "宿": "alojarse", "列": "alinear", "張": "extender", "寒": "frío", "來": "venir", "暑": "caliente", "往": "ir", "秋": "otoño", "收": "cosecha", "冬": "invierno", "藏": "almacenar", "閏": "bisiesto", "餘": "excedente", "成": "lograr", "歲": "año", "律": "ritmo", "呂": "tono", "調": "ajustar", "陽": "sol radiante", "雲": "nube", "騰": "subir", "致": "provocar", "雨": "lluvia", "露": "rocío", "結": "atar", "爲": "convertirse", "霜": "escarcha", "金": "oro", "生": "producir", "麗": "hermoso", "水": "agua", "玉": "jade", "出": "emerger", "崑": "Kunlun", "岡": "colina", "劍": "espada", "號": "nombre", "巨": "enorme", "闕": "puerta del palacio", "珠": "perla", "稱": "elogiar", "夜": "noche", "光": "luz", "果": "fruta", "珍": "tesoro", "李": "ciruelo", "柰": "manzano silvestre", "菜": "verdura", "重": "pesado", "芥": "mostaza", "薑": "jengibre", "海": "mar", "鹹": "salado", "河": "río", "淡": "fresco", "鱗": "escama", "潛": "sumergir", "羽": "pluma", "翔": "elevarse", "龍": "dragón", "師": "maestro", "火": "fuego", "帝": "emperador", "鳥": "pájaro", "官": "funcionario", "人": "persona", "皇": "soberano", "始": "comenzar", "制": "crear", "文": "escritura", "字": "carácter", "乃": "entonces", "服": "vestir", "衣": "ropa", "裳": "falda", "推": "empujar", "位": "puesto", "讓": "ceder", "國": "nación", "有": "tener", "虞": "Yu", "陶": "cerámica", "唐": "Tang", "弔": "consolar", "民": "pueblo", "伐": "atacar", "罪": "pecado", "周": "Zhou", "發": "emitir", "殷": "próspero", "湯": "agua caliente", "坐": "sentarse", "朝": "corte", "問": "preguntar", "道": "camino", "垂": "colgar", "拱": "juntar las manos", "平": "llano", "章": "capítulo", "愛": "amor", "育": "levantar", "黎": "de pelo negro", "首": "cabeza", "臣": "súbdito", "伏": "postrado", "戎": "bárbaro", "羌": "Qiang", "遐": "distante", "邇": "cerca", "壹": "uno", "體": "cuerpo", "率": "guiar", "賓": "invitado", "歸": "regresar", "王": "rey", "鳴": "llorar", "鳳": "fénix", "在": "existir", "樹": "árbol", "白": "blanco", "駒": "potro", "食": "comer", "場": "campo", "化": "transformar", "被": "cubrir", "草": "hierba", "木": "madera", "賴": "confiar", "及": "alcanzar", "萬": "diez mil", "方": "dirección", "蓋": "cubrir", "此": "esto", "身": "cuerpo", "髮": "cabello", "四": "cuatro", "大": "grande", "五": "cinco", "常": "constante", "恭": "respetuoso", "惟": "solo", "鞠": "criar", "養": "nutrir", "豈": "cómo", "敢": "atreverse", "毁": "destruir", "傷": "herir", "女": "mujer", "慕": "admirar", "貞": "casto", "烈": "feroz", "男": "hombre", "效": "imitar", "才": "talento", "良": "bueno", "知": "saber", "過": "falta", "必": "seguramente", "改": "correcto", "得": "obtener", "能": "capaz", "莫": "nunca", "忘": "olvidar", "罔": "no", "談": "conversar", "彼": "aquello", "短": "corto", "靡": "no", "恃": "depender de", "己": "sí mismo", "長": "largo", "信": "confianza", "使": "hacer", "可": "permisible", "覆": "volcar", "器": "vasija", "欲": "desear", "難": "difícil", "量": "medir", "墨": "tinta", "悲": "triste", "絲": "hilo", "染": "teñir", "詩": "poema", "讚": "elogiar", "羔": "cordero", "羊": "oveja", "景": "paisaje", "行": "caminar", "維": "solo", "賢": "sabio", "克": "vencer", "念": "pensar", "作": "hacer", "聖": "sabio", "德": "virtud", "建": "construir", "名": "nombre", "立": "estar de pie", "形": "forma", "端": "erguido", "表": "fuera", "正": "correcto", "空": "vacío", "谷": "valle", "傳": "transmitir", "聲": "sonido", "虛": "hueco", "堂": "sala", "習": "practicar", "聽": "escuchar", "禍": "desastre", "因": "causa", "惡": "maldad", "積": "acumular", "福": "bendición", "緣": "destino", "善": "bueno", "慶": "celebración", "尺": "pie", "璧": "disco de jade", "非": "no", "寶": "tesoro", "寸": "pulgada", "陰": "sombra", "是": "derecha", "競": "competir", "資": "recurso", "父": "padre", "事": "servir", "君": "señor", "曰": "decir", "嚴": "severo", "與": "dar", "敬": "respeto", "孝": "piedad filial", "當": "deber", "竭": "agotar", "力": "fuerza", "忠": "lealtad", "則": "entonces", "盡": "agotar", "命": "vida", "臨": "acercarse", "深": "profundo", "履": "pisar", "薄": "delgado", "夙": "temprano", "興": "subir", "溫": "cálido", "凊": "fresco", "似": "parecerse", "蘭": "orquídea", "斯": "esto", "馨": "fragante", "如": "como", "松": "pino", "之": "de", "盛": "florecer", "川": "corriente", "流": "fluir", "不": "no", "息": "descansar", "淵": "charca", "澄": "claro", "取": "tomar", "映": "reflejar", "容": "apariencia", "止": "detener", "若": "como si", "思": "pensar", "言": "discurso", "辭": "palabras", "安": "calma", "定": "establecerse", "篤": "sincero", "初": "comienzo", "誠": "sinceridad", "美": "hermoso", "愼": "cuidadoso", "終": "fin", "宜": "apropiado", "令": "bueno", "榮": "gloria", "業": "trabajo", "所": "lugar", "基": "cimiento", "籍": "registro", "甚": "muy", "無": "ninguno", "竟": "fin", "學": "aprender", "優": "sobresalir", "登": "ascender", "仕": "ocupar un cargo", "攝": "encargarse", "職": "deber", "從": "seguir", "政": "política", "存": "permanecer", "以": "con", "甘": "dulce", "棠": "peral", "去": "partir", "而": "y", "益": "aumentar", "詠": "cantar", "樂": "música", "殊": "diferir", "貴": "noble", "賤": "humilde", "禮": "etiqueta", "別": "distinguir", "尊": "honrado", "卑": "humilde", "上": "encima", "和": "armonía", "下": "debajo", "睦": "amistad", "夫": "esposo", "唱": "cantar", "婦": "esposa", "隨": "seguir", "外": "fuera", "受": "recibir", "傅": "tutor", "訓": "enseñar", "入": "entrar", "奉": "servir", "母": "madre", "儀": "modales", "諸": "todo", "姑": "tía", "伯": "primogénito", "叔": "tío", "猶": "como", "子": "niño", "比": "comparar", "兒": "niño", "孔": "muy", "懷": "apreciar", "兄": "hermano mayor", "弟": "hermano menor", "同": "mismo", "氣": "espíritu", "連": "conectar", "枝": "rama", "交": "asociarse", "友": "amigo", "投": "lanzar", "分": "compartir", "切": "cortar", "磨": "moler", "箴": "amonestar", "規": "regla", "仁": "benevolencia", "慈": "bondad", "隱": "esconder", "惻": "compasión", "造": "hacer", "次": "siguiente", "弗": "no", "離": "partir", "節": "integridad", "義": "rectitud", "廉": "honestidad", "退": "retirarse", "顚": "caer", "沛": "tropezar", "匪": "no", "虧": "carecer", "性": "naturaleza", "靜": "tranquilo", "情": "sentimiento", "逸": "comodidad", "心": "corazón", "動": "mover", "神": "espíritu", "疲": "cansado", "守": "guardar", "眞": "verdadero", "志": "voluntad", "滿": "lleno", "逐": "perseguir", "物": "cosa", "意": "intención", "移": "cambiar", "堅": "firme", "持": "sostener", "雅": "elegante", "操": "conducta", "好": "como", "爵": "rango", "自": "sí mismo", "縻": "atar", "都": "capital", "邑": "pueblo", "華": "espléndido", "夏": "verano", "東": "este", "西": "oeste", "二": "dos", "京": "capital", "背": "espalda", "邙": "Mang", "面": "rostro", "洛": "Luo", "浮": "flotar", "渭": "Wei", "據": "depender de", "涇": "Jing", "宮": "palacio", "殿": "sala", "盤": "enrollar", "鬱": "denso", "樓": "torre", "觀": "vista", "飛": "volar", "驚": "sobresaltar", "圖": "imagen", "寫": "dibujar", "禽": "pájaro", "獸": "bestia", "畵": "pintura", "彩": "color", "仙": "inmortal", "靈": "espíritu", "丙": "tercero", "舍": "casa", "傍": "junto a", "啓": "abrir", "甲": "primero", "帳": "cortina", "對": "rostro", "楹": "pilar", "肆": "emprender", "筵": "estera", "設": "disponer", "席": "asiento", "鼓": "tambor", "瑟": "cítara", "吹": "soplar", "笙": "órgano de caña", "陞": "ascender", "階": "escalones", "納": "ofrecer", "陛": "escalinata del palacio", "弁": "gorro", "轉": "girar", "疑": "dudar", "星": "estrella", "右": "derecha", "通": "atravesar", "廣": "ancho", "內": "dentro", "左": "izquierda", "達": "alcanzar", "承": "recibir", "明": "brillante", "旣": "ya", "集": "reunir", "墳": "texto antiguo", "典": "canon", "亦": "también", "聚": "reunir", "群": "grupo", "英": "héroe", "杜": "Du", "藁": "borrador", "鍾": "campana", "隸": "escritura oficial", "漆": "laca", "書": "escribir", "壁": "muro", "經": "clásico", "府": "oficina", "羅": "extender", "將": "general", "相": "ministro", "路": "camino", "夾": "flanco", "槐": "árbol de la pagoda", "卿": "ministro", "戶": "hogar", "封": "investir con feudo", "八": "ocho", "縣": "condado", "家": "familia", "給": "suministrar", "千": "mil", "兵": "soldado", "高": "alto", "冠": "gorro", "陪": "acompañar", "輦": "carro imperial", "驅": "conducir", "轂": "cubo de rueda", "振": "sacudir", "纓": "cinta del gorro", "世": "generación", "祿": "estipendio", "侈": "extravagante", "富": "rico", "車": "carro", "駕": "carruaje", "肥": "gordo", "輕": "luz", "策": "plan", "功": "mérito", "茂": "exuberante", "實": "fruta", "勒": "grabar", "碑": "estela", "刻": "tallar", "銘": "inscribir", "磻": "Pan", "溪": "arroyo", "伊": "Yi", "尹": "Yin", "佐": "asistir", "時": "tiempo", "阿": "colina", "衡": "balanza", "奄": "de repente", "宅": "vivienda", "曲": "doblar", "阜": "montículo", "微": "diminuto", "旦": "amanecer", "孰": "quién", "營": "administrar", "桓": "poderoso", "公": "duque", "匡": "rectificar", "合": "unir", "濟": "ayudar", "弱": "débil", "扶": "apoyar", "傾": "derrumbarse", "綺": "seda", "回": "regresar", "漢": "Han", "惠": "favor", "說": "Yue", "感": "sentir", "武": "marcial", "丁": "Ding", "俊": "talentoso", "乂": "gobernar", "密": "denso", "勿": "no hacer", "多": "muchos", "士": "erudito", "寔": "en verdad", "寧": "paz", "晉": "Jin", "楚": "Chu", "更": "otra vez", "霸": "hegemón", "趙": "Zhao", "魏": "Wei", "困": "penuria", "橫": "horizontal", "假": "tomar prestado", "途": "camino", "滅": "destruir", "虢": "Guo", "踐": "pisar", "土": "suelo", "會": "encontrar", "盟": "juramento", "何": "cómo", "遵": "seguir", "約": "promesa", "法": "ley", "韓": "Han", "弊": "gastado", "煩": "molesto", "刑": "castigo", "起": "subir", "翦": "Jian", "頗": "Po", "牧": "Mu", "用": "usar", "軍": "ejército", "最": "más", "精": "refinado", "宣": "proclamar", "威": "poder", "沙": "arena", "漠": "desierto", "馳": "galopar", "譽": "fama", "丹": "rojo", "靑": "azul", "九": "nueve", "州": "provincia", "禹": "Yu", "跡": "huella", "百": "cien", "郡": "distrito", "秦": "Qin", "幷": "fusionar", "嶽": "cumbre", "宗": "antepasado", "恒": "Heng", "岱": "Tai", "禪": "sacrificio", "主": "señor", "云": "decir", "亭": "pabellón", "雁": "ganso salvaje", "門": "puerta", "紫": "púrpura", "塞": "frontera", "鷄": "gallina", "田": "campo", "赤": "rojo", "城": "muralla", "昆": "Kun", "池": "estanque", "碣": "lápida", "石": "piedra", "鉅": "grandioso", "野": "yermos", "洞": "cueva", "庭": "patio", "曠": "vasto", "遠": "lejos", "綿": "continuo", "邈": "remoto", "巖": "acantilado", "峀": "cueva", "杳": "tenue", "冥": "oscuro", "治": "gobernar", "本": "raíz", "於": "en", "農": "agricultura", "務": "esforzarse", "茲": "esto", "稼": "sembrar", "穡": "cosechar", "俶": "comenzar", "載": "carga", "南": "sur", "畝": "lindero", "我": "I", "藝": "destreza", "黍": "mijo", "稷": "sorgo", "稅": "impuesto", "熟": "maduro", "貢": "tributo", "新": "nuevo", "勸": "animar", "賞": "recompensa", "黜": "destituir", "陟": "promover", "孟": "Meng", "軻": "Ke", "敦": "sincero", "素": "sencillo", "史": "historia", "魚": "pez", "秉": "sostener", "直": "recto", "庶": "muchos", "幾": "casi", "中": "medio", "庸": "significar", "勞": "esfuerzo", "謙": "modesto", "謹": "cauto", "勅": "amonestar", "聆": "oír", "音": "sonido", "察": "examinar", "理": "razón", "鑑": "espejo", "貌": "apariencia", "辨": "distinguir", "色": "color", "貽": "legar", "厥": "su", "嘉": "fino", "猷": "plan", "勉": "esforzarse", "其": "su", "祗": "venerar", "植": "plantar", "省": "examinar", "躬": "uno mismo", "譏": "burlarse", "誡": "advertir", "寵": "favor", "增": "aumentar", "抗": "resistir", "極": "extremo", "殆": "peligro", "辱": "deshonra", "近": "cerca", "恥": "vergüenza", "林": "bosque", "皐": "pantano", "幸": "afortunado", "卽": "de inmediato", "兩": "dos", "疏": "escaso", "見": "ver", "機": "oportunidad", "解": "desatar", "組": "cinta", "誰": "quién", "逼": "presionar", "索": "procurar", "居": "habitar", "閑": "ocio", "處": "lugar", "沈": "hundirse", "默": "silencioso", "寂": "aún", "寥": "solitario", "求": "procurar", "古": "antiguo", "尋": "buscar", "論": "discutir", "散": "dispersar", "慮": "reflexionar", "逍": "pasear", "遙": "vagar", "欣": "deleite", "奏": "presentar", "累": "carga", "遣": "disipar", "慼": "pena", "謝": "agradecer", "歡": "alegría", "招": "llamar", "渠": "canal", "荷": "loto", "的": "brillante", "歷": "atravesar", "園": "jardín", "莽": "maleza", "抽": "brotar", "條": "ramita", "枇": "níspero", "杷": "níspero", "晩": "tarde", "翠": "esmeralda", "梧": "paulonia", "桐": "paulonia", "早": "temprano", "凋": "marchitarse", "陳": "viejo", "根": "raíz", "委": "marchitarse", "翳": "sombra", "落": "caer", "葉": "hoja", "飄": "ondear", "颻": "ondear", "游": "nadar", "鵾": "grulla", "獨": "solo", "運": "mover", "凌": "elevarse", "摩": "pincel", "絳": "carmesí", "霄": "cielo", "耽": "complacer", "讀": "leer", "翫": "disfrutar", "市": "mercado", "寓": "alojarse", "目": "ojo", "囊": "bolsa", "箱": "pecho", "易": "fácil", "輶": "luz", "攸": "lo que", "畏": "miedo", "屬": "pertenecer", "耳": "oreja", "垣": "muro", "牆": "muro", "具": "preparar", "膳": "comida", "飡": "cena", "飯": "arroz", "適": "convenir", "口": "boca", "充": "llenar", "腸": "intestino", "飽": "lleno", "飫": "saciado", "烹": "hervir", "宰": "carnicero", "飢": "hambriento", "厭": "satisfecho", "糟": "posos", "糠": "paja", "親": "parientes", "戚": "pariente", "故": "viejo", "舊": "anterior", "老": "viejo", "少": "joven", "異": "diferente", "糧": "provisiones", "妾": "concubina", "御": "atender", "績": "hilar", "紡": "tejer", "侍": "atender", "巾": "toalla", "帷": "cortina", "房": "habitación", "紈": "seda blanca", "扇": "abanico", "圓": "redondo", "潔": "limpio", "銀": "plata", "燭": "vela", "煒": "brillante", "煌": "resplandeciente", "晝": "día", "眠": "dormir", "夕": "tarde", "寐": "dormir", "藍": "índigo", "筍": "brote de bambú", "象": "elefante", "牀": "cama", "絃": "cuerda", "歌": "canción", "酒": "vino", "讌": "banquete", "接": "recibir", "杯": "copa", "擧": "levantar", "觴": "cáliz", "矯": "enderezar", "手": "mano", "頓": "inclinarse", "足": "pie", "悅": "complacido", "豫": "contento", "且": "además", "康": "sano", "嫡": "heredero", "後": "después", "嗣": "suceder", "續": "continuar", "祭": "sacrificio", "祀": "adorar", "蒸": "ofrenda de invierno", "嘗": "ofrenda de otoño", "稽": "postrarse", "顙": "frente", "再": "otra vez", "拜": "inclinarse", "悚": "temeroso", "懼": "asustado", "恐": "temor", "惶": "alarmado", "牋": "carta", "牒": "nota", "簡": "resbalar", "要": "necesitar", "顧": "mirar atrás", "答": "responder", "審": "examinar", "詳": "detallado", "骸": "huesos", "垢": "tierra", "想": "imaginar", "浴": "bañarse", "執": "sostener", "熱": "calor", "願": "deseo", "凉": "fresco", "驢": "burro", "騾": "mula", "犢": "ternero", "特": "toro", "駭": "sobresaltar", "躍": "bisiesto", "超": "superar", "驤": "galopar", "誅": "ejecutar", "斬": "decapitar", "賊": "ladrón", "盜": "ladrón", "捕": "atrapar", "獲": "capturar", "叛": "rebelde", "亡": "huir", "布": "tela", "射": "disparar", "遼": "Liao", "丸": "bolita", "嵇": "Ji", "琴": "cítara", "阮": "Ruan", "嘯": "silbar", "恬": "calma", "筆": "pincel", "倫": "ética", "紙": "papel", "鈞": "Jun", "巧": "hábil", "任": "Ren", "釣": "pez", "釋": "liberar", "紛": "enredar", "利": "beneficio", "俗": "costumbre", "竝": "juntos", "皆": "todo", "佳": "fino", "妙": "maravilloso", "毛": "Mao", "施": "Shi", "淑": "virtuoso", "姿": "postura", "工": "oficio", "顰": "fruncir el ceño", "姸": "encantador", "笑": "sonreír", "年": "año", "矢": "flecha", "每": "cada", "催": "instar", "曦": "luz solar", "暉": "resplandor", "朗": "brillante", "曜": "brillar", "璇": "jade", "璣": "perla", "懸": "colgar", "斡": "girar", "晦": "luna nueva", "魄": "alma", "環": "anillo", "照": "iluminar", "指": "dedo", "薪": "leña", "修": "cultivar", "祐": "bendecir", "永": "siempre", "綏": "calmar", "吉": "auspicioso", "劭": "exhortar", "矩": "cuadrado", "步": "paso", "引": "guiar", "領": "cuello", "俯": "agacharse", "仰": "mirar arriba", "廊": "corredor", "廟": "templo", "束": "atar", "帶": "cinturón", "矜": "orgulloso", "莊": "solemne", "徘": "paso", "徊": "demorarse", "瞻": "mirar fijamente", "眺": "mirar a lo lejos", "孤": "solitario", "陋": "humilde", "寡": "pocos", "聞": "oír", "愚": "necio", "蒙": "ignorante", "等": "igual", "誚": "reprender", "謂": "decir", "語": "hablar", "助": "ayuda", "者": "persona", "焉": "partícula final", "哉": "partícula final", "乎": "partícula final", "也": "partícula final"};
+    var index = 0, isSliding = false;
+    var wrapper = document.getElementById("wrapper");
+    var card = document.getElementById("card");
+    var topRank = document.getElementById("topRank");
+    var topSuit = document.getElementById("topSuit");
+    var centerSuit = document.getElementById("centerSuit");
+    var cardNote = document.getElementById("cardNote");
+    var bottomRank = document.getElementById("bottomRank");
+    var bottomSuit = document.getElementById("bottomSuit");
+
+    function updateCard() {
+      var item = cards[index];
+      if (!item) return;
+      document.getElementById("hanja").textContent = item[0];
+      document.getElementById("hun").textContent = item[1];
+      document.getElementById("en").textContent = EN[item[0]] || "";
+      document.getElementById("es").textContent = ES[item[0]] || "";
+      applyLang();
+    }
+
+    function goNext() {
+      if (isSliding) return;
+      isSliding = true;
+      wrapper.classList.add("slide-out-right");
+      setTimeout(function () {
+        card.classList.remove("is-flipped");
+        index = (index + 1) % cards.length;
+        updateCard();
+        wrapper.classList.remove("slide-out-right");
+        wrapper.classList.add("enter-from-left");
+        void wrapper.offsetWidth;
+        wrapper.classList.remove("enter-from-left");
+        setTimeout(function () { isSliding = false; }, 260);
+      }, 400);
+    }
+
+    function goPrev() {
+      if (isSliding) return;
+      isSliding = true;
+      wrapper.classList.add("slide-out-left");
+      setTimeout(function () {
+        card.classList.remove("is-flipped");
+        index = (index - 1 + cards.length) % cards.length;
+        updateCard();
+        wrapper.classList.remove("slide-out-left");
+        wrapper.classList.add("enter-from-right");
+        void wrapper.offsetWidth;
+        wrapper.classList.remove("enter-from-right");
+        setTimeout(function () { isSliding = false; }, 260);
+      }, 400);
+    }
+
+    function handleAction(startX, endX, endY) {
+      if (isSliding) return;
+      var diffX = endX - startX;
+      var rect = card.getBoundingClientRect();
+      var relX = endX - rect.left;
+      if (diffX > 30) { goNext(); return; }
+      if (diffX < -30) { goPrev(); return; }
+      if (Math.abs(diffX) <= 30) {
+        var relY = endY - rect.top;
+        if (mode === "main" && relY < rect.height * 0.15) { saveProgress(); return; }
+        if (mode === "saved" && relY > rect.height * 0.85) { saveProgress(); return; }
+        if (relX > rect.width * 0.7) goNext();
+        else if (relX < rect.width * 0.3) goPrev();
+        else card.classList.toggle("is-flipped");
+      }
+    }
+
+    var downX = 0, isTouching = false;
+    card.addEventListener("touchstart", function (e) { isTouching = true; downX = e.touches[0].clientX; }, false);
+    card.addEventListener("touchend", function (e) {
+      handleAction(downX, e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+      setTimeout(function () { isTouching = false; }, 300);
+    }, false);
+    card.addEventListener("mousedown", function (e) { if (!isTouching) downX = e.clientX; }, false);
+    card.addEventListener("mouseup", function (e) { if (!isTouching) handleAction(downX, e.clientX, e.clientY); }, false);
+
+    var KEY = "cheonjamun-saved";
+    var allCards = cards.slice();
+    var savedIds = [];
+    try {
+      var raw = JSON.parse(localStorage.getItem(KEY) || "[]");
+      if (Array.isArray(raw)) savedIds = raw.filter(function (n) { return typeof n === "number" && n >= 0 && n < allCards.length; });
+    } catch (e) {}
+    var mode = "main", mainDeck = [], savedDeck = [], deckIds = [];
+    var startScreen = document.getElementById("startScreen");
+    var statusEl = document.getElementById("status");
+    var homeBtn = document.getElementById("homeBtn");
+
+    function persist() {
+      try { localStorage.setItem(KEY, JSON.stringify(savedIds)); return true; } catch (e) { return false; }
+    }
+    function buildDecks() {
+      var set = {};
+      savedIds.forEach(function (i) { set[i] = true; });
+      mainDeck = [];
+      allCards.forEach(function (c, i) { if (!set[i]) mainDeck.push(i); });
+      savedDeck = savedIds.slice();
+    }
+    function setMode(m) {
+      mode = m;
+      buildDecks();
+      deckIds = (m === "saved" ? savedDeck : mainDeck).slice();
+      cards = deckIds.map(function (i) { return allCards[i]; });
+      index = 0;
+    }
+    var statusKey = "default";
+    function isEnUI() { return lang.en && !lang.ko; }
+    function uiKey() { return lang.es ? "es" : (isEnUI() ? "en" : "ko"); }
+    var GUIDE = {"ko": [{"h": "시작하기", "l": ["메인에서 언어(한국어 · English · Español)를 고르고 ‘들어가기’를 누르세요.", "시작 화면에서 ‘시작’을 누르면 천자문 카드 학습이 시작돼요."]}, {"h": "카드 보기", "l": ["카드 가운데를 탭하면 뒤집혀요. 앞면은 한자, 뒷면은 훈·음과 뜻이에요.", "카드를 오른쪽으로 밀거나 카드 오른쪽 끝을 탭하면 다음 카드로 넘어가요.", "카드를 왼쪽으로 밀거나 카드 왼쪽 끝을 탭하면 이전 카드로 돌아가요.", "마지막 카드 다음에는 처음 카드로 이어져요."]}, {"h": "카드 저장하기", "l": ["따로 모아 둘 카드는 카드의 맨 위쪽 가장자리를 탭하세요. 저장으로 옮겨지고 천자문 목록에서는 빠져요.", "저장한 카드를 다시 천자문으로 돌려보내려면, ‘저장’ 목록에서 카드의 맨 아래쪽 가장자리를 탭하세요."]}, {"h": "버튼 안내", "l": ["시작: 저장하지 않은 천자문 카드를 처음부터 봐요.", "저장: 저장해 둔 카드만 모아서 봐요.", "초기화: 저장한 카드를 모두 천자문으로 되돌려요.", "처음: 카드 화면에서 시작 화면으로 돌아가요.", "메인: 시작 화면에서 언어를 고르는 메인으로 돌아가요."]}, {"h": "알아두기", "l": ["저장한 카드와 선택한 언어는 이 기기에 기억돼서 다시 열어도 그대로예요.", "스페인어 뜻은 Español을 선택했을 때만 뒷면에 나와요.", "인터넷 없이도 사용할 수 있어요."]}], "en": [{"h": "Getting started", "l": ["On the main page, choose a language (한국어 · English · Español) and tap “Enter”.", "On the start page, tap “Start” to begin studying the cards."]}, {"h": "Viewing cards", "l": ["Tap the middle of the card to flip it. The front shows the character; the back shows its Korean reading and meaning.", "Swipe the card right, or tap its right edge, to go to the next card.", "Swipe the card left, or tap its left edge, to go back to the previous card.", "After the last card, the deck loops back to the first."]}, {"h": "Saving cards", "l": ["To set a card aside, tap the very top edge of the card. It moves to Saved and leaves the main deck.", "To send a saved card back to the deck, open “Saved” and tap the very bottom edge of the card."]}, {"h": "Buttons", "l": ["Start: go through the cards that are not saved, from the beginning.", "Saved: study only the cards you have saved.", "Reset: return all saved cards to the main deck.", "Home: from the cards, go back to the start page.", "Main: from the start page, go back to the language page."]}, {"h": "Good to know", "l": ["Saved cards and your language choice are remembered on this device.", "Spanish meanings appear on the back only when Español is selected.", "It works without an internet connection."]}], "es": [{"h": "Primeros pasos", "l": ["En el menú principal, elige un idioma (한국어 · English · Español) y toca “Entrar”.", "En la pantalla de inicio, toca “Empezar” para comenzar a estudiar las tarjetas."]}, {"h": "Ver las tarjetas", "l": ["Toca el centro de la tarjeta para voltearla. El anverso muestra el carácter; el reverso, su lectura en coreano y su significado.", "Desliza la tarjeta a la derecha, o toca su borde derecho, para ir a la siguiente.", "Desliza la tarjeta a la izquierda, o toca su borde izquierdo, para volver a la anterior.", "Después de la última tarjeta, el mazo vuelve a la primera."]}, {"h": "Guardar tarjetas", "l": ["Para apartar una tarjeta, toca el borde superior de la tarjeta. Pasa a Guardados y sale del mazo principal.", "Para devolver una tarjeta guardada al mazo, abre “Guardados” y toca el borde inferior de la tarjeta."]}, {"h": "Botones", "l": ["Empezar: recorre las tarjetas no guardadas desde el principio.", "Guardados: estudia solo las tarjetas que has guardado.", "Restablecer: devuelve todas las tarjetas guardadas al mazo principal.", "Inicio: desde las tarjetas, vuelve a la pantalla de inicio.", "Menú: desde la pantalla de inicio, vuelve a la selección de idioma."]}, {"h": "Conviene saber", "l": ["Las tarjetas guardadas y el idioma elegido se recuerdan en este dispositivo.", "Los significados en español aparecen en el reverso solo cuando se elige Español.", "Funciona sin conexión a internet."]}]};
+    var STR = {
+      ko: { title: "천자문", save: "저장", start: "시작", reset: "초기화", home: "처음", enter: "들어가기", back: "메인", guide: "사용설명서", close: "닫기", tag: "천 개의 한자를 카드로 익혀요",
+            allMoved: "천자문 카드를 모두 저장으로 옮겼어요", noSaved: "저장된 카드가 없어요",
+            toSaved: "저장으로 이동됨", toMain: "천자문으로 이동됨", noPersist: "이 기기에서는 저장이 유지되지 않아요" },
+      en: { title: "Thousand Character Classic", save: "Saved", start: "Start", reset: "Reset", home: "Home", enter: "Enter", back: "Main", guide: "How to use", close: "Close", tag: "Learn 1,000 characters with flashcards",
+            allMoved: "All cards moved to Saved", noSaved: "No saved cards",
+            toSaved: "Moved to Saved", toMain: "Moved back to deck", noPersist: "Saving isn't kept on this device" },
+      es: { title: "Clásico de los Mil Caracteres", save: "Guardados", start: "Empezar", reset: "Restablecer", home: "Inicio", enter: "Entrar", back: "Menú", guide: "Cómo usar", close: "Cerrar", tag: "Aprende 1000 caracteres con tarjetas",
+            allMoved: "Todas las tarjetas están en Guardados", noSaved: "No hay tarjetas guardadas",
+            toSaved: "Movida a Guardados", toMain: "Devuelta al mazo", noPersist: "El guardado no se conserva en este dispositivo" }
+    };
+    function S(k) { return STR[uiKey()][k]; }
+    function renderStatus() {
+      var en = isEnUI(), es = !!lang.es;
+      if (statusKey === "allMoved" || statusKey === "noSaved") statusEl.textContent = S(statusKey);
+      else if (statusKey === "reset") statusEl.textContent = es ? "Restablecido · " + mainDeck.length + " tarjetas" : en ? "Reset · " + mainDeck.length + " cards" : "초기화됨 · 천자문 " + mainDeck.length + "장";
+      else statusEl.textContent = es ? ("Tarjetas " + mainDeck.length + " · Guardadas " + savedDeck.length) : en ? ("Cards " + mainDeck.length + " · Saved " + savedDeck.length) : ("천자문 " + mainDeck.length + "장 · 저장 " + savedDeck.length + "장");
+    }
+    function refreshStatus(key) { statusKey = key || "default"; renderStatus(); }
+    function renderGuide() {
+      var body = document.getElementById("guideBody");
+      body.textContent = "";
+      GUIDE[uiKey()].forEach(function (sec) {
+        var card = document.createElement("section"); card.className = "g-card";
+        var h = document.createElement("h3"); h.textContent = sec.h; card.appendChild(h);
+        var ul = document.createElement("ul");
+        sec.l.forEach(function (t) { var li = document.createElement("li"); li.textContent = t; ul.appendChild(li); });
+        card.appendChild(ul); body.appendChild(card);
+      });
+    }
+    function openGuide() {
+      var g = document.getElementById("guide");
+      g.style.display = "flex"; document.getElementById("guideBody").scrollTop = 0;
+      document.getElementById("guideClose").focus();
+    }
+    function closeGuide() { document.getElementById("guide").style.display = "none"; document.getElementById("guideBtn").focus(); }
+    function applyUI() {
+      var en = uiKey() !== "ko";
+      document.documentElement.lang = uiKey();
+      startScreen.classList.toggle("en-ui", en);
+      startScreen.querySelector("h1").textContent = S("title");
+      document.getElementById("saveBtn").textContent = S("save");
+      document.getElementById("startBtn").textContent = S("start");
+      document.getElementById("resetBtn").textContent = S("reset");
+      homeBtn.textContent = S("home");
+      var landingEl = document.getElementById("landing");
+      landingEl.classList.toggle("en-ui", en);
+      landingEl.querySelector("h1").textContent = S("title");
+      document.getElementById("landingSub").textContent = S("tag");
+      document.getElementById("enterBtn").textContent = S("enter");
+      document.getElementById("backBtn").textContent = S("back");
+      document.getElementById("guideBtn").textContent = S("guide");
+      document.getElementById("guideTitle").textContent = S("guide");
+      document.getElementById("guideClose").setAttribute("aria-label", S("close"));
+      renderGuide();
+      document.getElementById("es").style.display = lang.es ? "" : "none";
+      renderStatus();
+    }
+    function openDeck() {
+      card.classList.remove("is-flipped");
+      startScreen.style.display = "none";
+      wrapper.style.display = "";
+      homeBtn.style.display = "";
+      updateCard();
+    }
+    function goHome(msg) {
+      wrapper.style.display = "none";
+      homeBtn.style.display = "none";
+      startScreen.style.display = "flex";
+      buildDecks();
+      refreshStatus(msg);
+    }
+
+    document.getElementById("startBtn").addEventListener("click", function () {
+      setMode("main");
+      if (!cards.length) { refreshStatus("allMoved"); return; }
+      openDeck();
+    });
+    document.getElementById("saveBtn").addEventListener("click", function () {
+      setMode("saved");
+      if (!cards.length) { refreshStatus("noSaved"); return; }
+      openDeck();
+    });
+    document.getElementById("resetBtn").addEventListener("click", function () {
+      savedIds = [];
+      persist();
+      setMode("main");
+      refreshStatus("reset");
+    });
+    homeBtn.addEventListener("click", function () { goHome(); });
+
+    var toastEl = document.createElement("div");
+    toastEl.style.cssText = "position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 56px);transform:translateX(-50%);z-index:20;padding:12px 20px;border-radius:4px;background:#323232;color:#fff;font-size:0.9rem;font-weight:500;box-shadow:0 3px 5px rgba(0,0,0,.2);opacity:0;transition:opacity 0.2s ease;pointer-events:none;white-space:nowrap;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;";
+    document.body.appendChild(toastEl);
+    var toastTimer = null;
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.style.opacity = "1";
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toastEl.style.opacity = "0"; }, 1200);
+    }
+
+    // 카드 위쪽을 탭하면: 천자문 -> 저장으로 이동, 저장 -> 천자문으로 되돌림
+    function saveProgress() {
+      if (!cards.length) return;
+      var id = deckIds[index];
+      if (mode === "main") savedIds.push(id);
+      else savedIds = savedIds.filter(function (x) { return x !== id; });
+      var ok = persist();
+      deckIds.splice(index, 1);
+      cards.splice(index, 1);
+      showToast(ok ? (mode === "main" ? S("toSaved") : S("toMain")) : S("noPersist"));
+      if (!cards.length) { goHome(mode === "main" ? "allMoved" : "noSaved"); return; }
+      if (index >= cards.length) index = 0;
+      card.classList.remove("is-flipped");
+      updateCard();
+    }
+
+    var LKEY = "cheonjamun-lang";
+    var lang = { ko: true, en: false };
+    try {
+      var lr = JSON.parse(localStorage.getItem(LKEY) || "null");
+      if (lr && lr.es) lang = { ko: false, en: false, es: true };
+      else if (lr && lr.en && !lr.ko) lang = { ko: false, en: true };
+    } catch (e) {}
+    function applyLang() {
+      applyUI();
+      [["langKo", "ko"], ["langEn", "en"], ["langEs", "es"]].forEach(function (p) {
+        var b = document.getElementById(p[0]);
+        b.classList.toggle("on", lang[p[1]]);
+        b.setAttribute("aria-pressed", lang[p[1]] ? "true" : "false");
+      });
+    }
+    function toggleLang(k) {
+      lang = { ko: k === "ko", en: k === "en", es: k === "es" };
+      try { localStorage.setItem(LKEY, JSON.stringify(lang)); } catch (e) {}
+      applyLang();
+    }
+    document.getElementById("langKo").addEventListener("click", function () { toggleLang("ko"); });
+    document.getElementById("langEn").addEventListener("click", function () { toggleLang("en"); });
+    document.getElementById("langEs").addEventListener("click", function () { toggleLang("es"); });
+
+    document.getElementById("enterBtn").addEventListener("click", function () {
+      document.getElementById("landing").style.display = "none";
+      startScreen.style.display = "flex";
+    });
+    document.getElementById("backBtn").addEventListener("click", function () {
+      startScreen.style.display = "none";
+      document.getElementById("landing").style.display = "flex";
+    });
+
+    document.getElementById("guideBtn").addEventListener("click", openGuide);
+    document.getElementById("guideClose").addEventListener("click", closeGuide);
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && document.getElementById("guide").style.display !== "none") closeGuide();
+    });
+
+    buildDecks();
+    setMode("main");
+    applyLang();
+    updateCard();
+    refreshStatus();
+  </script>
+</body>
+</html>
